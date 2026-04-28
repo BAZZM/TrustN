@@ -1,0 +1,116 @@
+# Trust Network – Docker Compose
+# Run from the repo root that contains your frontend/ source (e.g. Incentif/trust-network).
+# Clean rebuild: docker compose build --no-cache && docker compose up -d
+# Frontend code changed? Rebuild and recreate: docker compose build frontend --no-cache && docker compose up -d
+# Full reset (wipe DB): docker compose down -v && docker compose build --no-cache && docker compose up -d
+
+services:
+  database:
+    image: postgres:15-alpine
+    container_name: trust-network-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trustnetwork
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme123}
+      POSTGRES_DB: trustnetwork
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Run schema then migrations in order (alphabetical)
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/migrations/001_user_preferences_and_themes.sql:/docker-entrypoint-initdb.d/02_migrations.sql:ro
+      - ./database/migrations/002_schema_version_and_instances.sql:/docker-entrypoint-initdb.d/03_schema_version_and_instances.sql:ro
+      - ./database/migrations/003_contacts_and_dual_approval.sql:/docker-entrypoint-initdb.d/04_contacts_dual_approval.sql:ro
+      - ./database/migrations/004_security_hardening.sql:/docker-entrypoint-initdb.d/05_security_hardening.sql:ro
+      - ./database/migrations/005_comprehensive_test_data.sql:/docker-entrypoint-initdb.d/06_comprehensive_test_data.sql:ro
+      - ./database/migrations/006_verify_and_fix_test_data.sql:/docker-entrypoint-initdb.d/07_verify_and_fix_test_data.sql:ro
+      - ./database/migrations/007_test_user_100_inner_200_secondary.sql:/docker-entrypoint-initdb.d/08_test_user_100_inner_200_secondary.sql:ro
+      - ./database/migrations/008_relationship_based_secondary_connections.sql:/docker-entrypoint-initdb.d/09_relationship_based_secondary_connections.sql:ro
+      - ./database/migrations/009_admin_config_and_otp.sql:/docker-entrypoint-initdb.d/10_admin_config_and_otp.sql:ro
+      - ./database/migrations/010_rls_connections_access_requests.sql:/docker-entrypoint-initdb.d/11_rls_connections_access_requests.sql:ro
+      - ./database/migrations/011_connection_strength_computed.sql:/docker-entrypoint-initdb.d/12_connection_strength_computed.sql:ro
+      - ./database/migrations/012_rls_fixups_and_helpers.sql:/docker-entrypoint-initdb.d/13_rls_fixups_and_helpers.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustnetwork -d trustnetwork"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - trust-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: trust-network-api:latest
+    container_name: trust-network-api
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: "postgresql://trustnetwork:${POSTGRES_PASSWORD:-changeme123}@database:5432/trustnetwork"
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost}"
+      JWT_SECRET: ${JWT_SECRET:-default-secret-change-in-production}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      ADMIN_USER_IDS: ${ADMIN_USER_IDS:-1}
+      ADMIN_PHONES: ${ADMIN_PHONES:-}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      trust-network:
+        aliases:
+          - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: trust-network-web:latest
+    container_name: trust-network-web
+    user: "0"
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - trust-network
+    # Use nginx config from repo (optional override); do NOT mount build dir so image content is used
+    volumes:
+      - ./frontend/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+
+networks:
+  trust-network:
+    driver: bridge

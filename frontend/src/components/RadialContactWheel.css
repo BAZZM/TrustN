@@ -1,0 +1,154 @@
+/* Radial contact wheel – supplementary styles (detail panel, old radial-wheel) */
+
+/* Legacy radial-wheel (kept for any grid/list references) */
+.radial-wheel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-md);
+}
+
+.radial-wheel__disk-wrap {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.radial-wheel__svg {
+  display: block;
+  overflow: visible;
+}
+
+.radial-wheel__ring {
+  transform-origin: 0 0;
+}
+
+.radial-wheel__ring-empty {
+  font-size: 10px;
+  fill: var(--color-text-muted);
+}
+
+.radial-wheel__node-wrap {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.radial-wheel__node {
+  transition: stroke 0.2s, fill 0.2s;
+}
+
+/* Expandable detail panel */
+.radial-detail {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 200px;
+  max-width: 280px;
+  padding: var(--space-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  z-index: 10;
+}
+
+.radial-detail__inner {
+  text-align: center;
+}
+
+.radial-detail__avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 auto var(--space-md);
+}
+
+.radial-detail__name {
+  margin: 0 0 var(--space-xs);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.radial-detail__role,
+.radial-detail__phone {
+  margin: 0 0 var(--space-sm);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.radial-detail__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.radial-detail__btn {
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 40px;
+}
+
+.radial-detail__btn--primary {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.radial-detail__btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* Radial view container */
+.contacts__radial-view {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── View mode switcher (kept for RadialContactWheel imports) ─── */
+.contacts__view-mode {
+  display: flex;
+  gap: 0;
+  margin-bottom: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 3px;
+  width: fit-content;
+}
+
+.contacts__view-btn {
+  padding: var(--space-xs) var(--space-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 32px;
+}
+
+.contacts__view-btn--active {
+  background: var(--color-accent);
+  color: var(--color-bg);
+}

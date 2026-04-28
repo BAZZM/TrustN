@@ -1,0 +1,30 @@
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Secrets and env
+.env
+.env.local
+.env.*.local
+!.env.example
+backend/.env
+
+# Builds
+frontend/build/
+**/dist/
+
+# Logs / debug
+npm-debug.log*
+*.log
+
+# IDE / tooling
+.idea/
+.vscode/
+.cursor/
+
+# Backups / local artifacts (not part of repo)
+align-db-backups/
+compose-fix-backups/
+frontend_state_report.txt

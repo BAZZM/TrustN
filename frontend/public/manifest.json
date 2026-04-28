@@ -1,0 +1,8 @@
+﻿{
+  "name": "Trust Network",
+  "short_name": "TrustNet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e40af"
+}

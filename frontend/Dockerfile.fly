@@ -1,0 +1,28 @@
+# Production front-end for Fly.io — SPA only; REACT_APP_API_URL must match your Fly API HTTPS URL at build time
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# Set at deploy time: --build-arg REACT_APP_API_URL=https://YOUR-APP.fly.dev
+ARG REACT_APP_API_URL=""
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
+ENV NODE_ENV=production
+
+RUN npm run build
+
+FROM nginx:1.25-alpine
+
+RUN rm /etc/nginx/conf.d/default.conf
+
+COPY nginx/fly-static.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/build /usr/share/nginx/html
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1/health || exit 1
+
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,0 +1,95 @@
+/* Trust Network – design tokens & base */
+:root {
+  /* Warm, calm palette – trust-oriented */
+  --color-bg: #0f0f0f;
+  --color-surface: #181818;
+  --color-surface-elevated: #222;
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-text: #f0f0f0;
+  --color-text-muted: #888;
+  --color-accent: #e8b86d;
+  --color-accent-soft: rgba(232, 184, 109, 0.15);
+  --color-success: #7cb083;
+  --color-error: #d47a7a;
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --shadow-soft: 0 4px 24px rgba(0, 0, 0, 0.25);
+  --transition-fast: 0.2s var(--ease-out-expo);
+  --transition-medium: 0.35s var(--ease-out-expo);
+  --transition-slow: 0.5s var(--ease-out-expo);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+  min-height: 100dvh;
+  padding: var(--safe-top) 0 var(--safe-bottom);
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0.01ms;
+    --transition-medium: 0.01ms;
+    --transition-slow: 0.01ms;
+  }
+}
+
+/* Profile: large text (accessibility) */
+[data-large-text="true"] body {
+  font-size: 18px;
+}
+
+[data-large-text="true"] .dashboard__title,
+[data-large-text="true"] .connections__title,
+[data-large-text="true"] .settings__title,
+[data-large-text="true"] .activity__title {
+  font-size: 2rem;
+}
+
+/* Profile: high contrast */
+[data-high-contrast="true"] {
+  --color-border: rgba(255, 255, 255, 0.15);
+  --color-text-muted: #bbb;
+}
+
+/* Utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

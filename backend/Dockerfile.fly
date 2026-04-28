@@ -1,0 +1,20 @@
+# Build from repository root so database/ SQL is included (Fly Postgres bootstrap).
+# Docker Compose keeps using Dockerfile (backend-only context).
+FROM node:18-alpine
+
+RUN apk add --no-cache wget
+
+WORKDIR /app
+
+COPY backend/package*.json ./
+RUN npm ci --omit=dev
+
+COPY backend/ ./
+COPY database/ ./database
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 CMD wget -q --spider http://127.0.0.1:8080/health
+
+CMD ["node", "server.js"]
+

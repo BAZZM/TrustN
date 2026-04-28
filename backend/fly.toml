@@ -1,0 +1,35 @@
+# TrustN API — Fly.io (deploy from backend/)
+# Usage: cd backend && fly launch / fly deploy (see deploy/FLY.md)
+app = "trustn-api"
+primary_region = "iad"
+
+[build]
+  context = ".."
+  dockerfile = "Dockerfile.fly"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+
+[deploy]
+  release_command = "node scripts/db-bootstrap.js"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
