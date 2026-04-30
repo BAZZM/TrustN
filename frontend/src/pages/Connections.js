@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useLocation } from "react-router-dom";
 import axios from "axios";
 import { useApp } from "../context/AppContext";
 import { useTranslations } from "../i18n";
@@ -13,8 +14,21 @@ import {
 import "./Connections.css";
 
 export default function Connections() {
+  const location = useLocation();
   const { user, baseURL } = useApp();
   const t = useTranslations(user?.locale ? user.locale : "en");
+  const [narrowViewport, setNarrowViewport] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : true
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const apply = () => setNarrowViewport(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
   const [connections, setConnections] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -202,6 +216,9 @@ export default function Connections() {
 
   const isSecondaryLoading = Boolean(focusUserId && secondaryLoadingFor === focusUserId);
   const showTrustGraph = !loading && innerConnections.length > 0;
+  const immersiveGraph = showTrustGraph && narrowViewport;
+  const needsDockClearance =
+    location.pathname === "/connections" && narrowViewport && !immersiveGraph;
 
   const pageHeader = (
     <motion.header
@@ -210,73 +227,113 @@ export default function Connections() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
     >
-        <div>
-          <h1 className="connections__title">{t("connections.title")}</h1>
-          <p className="connections__subtitle">{t("connections.subtitle")}</p>
-        </div>
+      <div>
+        <h1 className="connections__title">{t("connections.title")}</h1>
+        <p className="connections__subtitle">{t("connections.subtitle")}</p>
+      </div>
 
-        {!showTrustGraph && (
-          <div className="connections__stats" aria-label={t("connections.networkSummary")}>
-            {stats.map((stat) => (
-              <div key={stat.label} className="connections__stat">
-                <span className="connections__stat-value">{stat.value}</span>
-                <span className="connections__stat-label">{stat.label}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </motion.header>
+      {!showTrustGraph && (
+        <div className="connections__stats" aria-label={t("connections.networkSummary")}>
+          {stats.map((stat) => (
+            <div key={stat.label} className="connections__stat">
+              <span className="connections__stat-value">{stat.value}</span>
+              <span className="connections__stat-label">{stat.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.header>
+  );
+
+  const graphSharedProps = {
+    currentUserName: user?.name || user?.phone,
+    innerConnections: visibleInnerConnections,
+    overflowInnerConnections,
+    focusUserId,
+    focusedConnection,
+    secondaryConnections,
+    secondaryLoading: isSecondaryLoading,
+    onFocusConnection: handleFocusConnection,
+    onResetFocus: handleResetFocus,
+    onFocusOverflow: handleFocusConnection,
+    t,
+  };
+
+  const statsChips = (
+    <div className="connections__stats connections__stats--hud">
+      {stats.map((stat) => (
+        <div key={stat.label} className="connections__stat connections__stat--hud">
+          <span className="connections__stat-value">{stat.value}</span>
+          <span className="connections__stat-label">{stat.label}</span>
+        </div>
+      ))}
+    </div>
   );
 
   return (
     <motion.div
-      className="page connections"
+      className={[
+        "page",
+        "connections",
+        immersiveGraph ? "connections--immersive" : "",
+        needsDockClearance ? "connections--dock-clearance" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
     >
       {showTrustGraph ? (
-        <div className="connections__inner-flow">
-          {pageHeader}
-          <div className="connections__graph-stack">
+        immersiveGraph ? (
+          <div className="connections__inner-flow connections__inner-flow--immersive">
             <ConnectionsGraph
-              currentUserName={user?.name || user?.phone}
-              innerConnections={visibleInnerConnections}
-              overflowInnerConnections={overflowInnerConnections}
-              focusUserId={focusUserId}
-              focusedConnection={focusedConnection}
-              secondaryConnections={secondaryConnections}
-              secondaryLoading={isSecondaryLoading}
-              onFocusConnection={handleFocusConnection}
-              onResetFocus={handleResetFocus}
-              onFocusOverflow={handleFocusConnection}
-              t={t}
-            />
-
-            <div
-              className="connections__stats connections__stats--below-graph"
-              aria-label={t("connections.networkSummary")}
-            >
-              {stats.map((stat) => (
-                <div key={stat.label} className="connections__stat">
-                  <span className="connections__stat-value">{stat.value}</span>
-                  <span className="connections__stat-label">{stat.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <ConnectionRequestsPanel
-              requests={requests}
-              userId={user?.id}
-              isOpen={requestsOpen}
-              onToggle={() => setRequestsOpen((current) => !current)}
-              onRespond={respondToRequest}
-              respondingId={respondingId}
-              t={t}
+              immersive
+              {...graphSharedProps}
+              statsSummary={statsChips}
+              requestsSlot={
+                <ConnectionRequestsPanel
+                  requests={requests}
+                  userId={user?.id}
+                  isOpen={requestsOpen}
+                  onToggle={() => setRequestsOpen((current) => !current)}
+                  onRespond={respondToRequest}
+                  respondingId={respondingId}
+                  t={t}
+                  panelClassName="connections__requests-panel--embedded"
+                />
+              }
             />
           </div>
-        </div>
+        ) : (
+          <div className="connections__inner-flow">
+            {pageHeader}
+            <div className="connections__graph-stack">
+              <ConnectionsGraph {...graphSharedProps} />
+              <div
+                className="connections__stats connections__stats--below-graph"
+                aria-label={t("connections.networkSummary")}
+              >
+                {stats.map((stat) => (
+                  <div key={stat.label} className="connections__stat">
+                    <span className="connections__stat-value">{stat.value}</span>
+                    <span className="connections__stat-label">{stat.label}</span>
+                  </div>
+                ))}
+              </div>
+              <ConnectionRequestsPanel
+                requests={requests}
+                userId={user?.id}
+                isOpen={requestsOpen}
+                onToggle={() => setRequestsOpen((current) => !current)}
+                onRespond={respondToRequest}
+                respondingId={respondingId}
+                t={t}
+              />
+            </div>
+          </div>
+        )
       ) : (
         <>
           {pageHeader}

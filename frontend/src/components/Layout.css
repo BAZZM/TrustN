@@ -138,6 +138,43 @@
   transform: translateX(-50%);
 }
 
+/* ─── Floating dock (Connections immersive – blends into scene; theme via CSS vars) ─── */
+.layout-nav--floating {
+  left: 12px;
+  right: 12px;
+  bottom: calc(10px + var(--safe-bottom));
+  width: auto;
+  padding-bottom: 0;
+  border-top: none;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--dock-border);
+  background: var(--dock-surface);
+  box-shadow: var(--dock-shadow);
+  backdrop-filter: blur(var(--dock-blur));
+  -webkit-backdrop-filter: blur(var(--dock-blur));
+}
+
+.layout-nav--floating .layout-nav__list {
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: inherit;
+}
+
+.layout-nav--floating .layout-nav__link {
+  color: rgba(240, 240, 240, 0.55);
+}
+
+.layout-nav--floating .layout-nav__icon {
+  opacity: 0.72;
+}
+
+.layout-nav--floating .layout-nav__link[aria-current="page"] {
+  color: var(--color-accent);
+}
+
+.layout-nav--floating .layout-nav__link[aria-current="page"] .layout-nav__icon {
+  opacity: 1;
+}
+
 @media (min-width: 768px) {
   .layout-header {
     padding: var(--space-md) var(--space-lg);

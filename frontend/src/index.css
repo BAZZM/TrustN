@@ -30,6 +30,16 @@
   --transition-slow: 0.5s var(--ease-out-expo);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Floating dock / immersive graph – override per theme when available */
+  --dock-surface: rgba(15, 15, 15, 0.72);
+  --dock-border: rgba(255, 255, 255, 0.09);
+  --dock-blur: 20px;
+  --dock-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  --hud-surface: rgba(10, 12, 18, 0.62);
+  --hud-border: rgba(255, 255, 255, 0.08);
+  --sheet-surface: rgba(14, 16, 24, 0.92);
+  --floating-nav-clearance: calc(76px + var(--safe-bottom));
 }
 
 * {
@@ -53,6 +63,8 @@ body {
 
 #root {
   min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (prefers-reduced-motion: reduce) {

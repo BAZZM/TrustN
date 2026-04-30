@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useApp } from "../context/AppContext";
@@ -16,9 +16,22 @@ const navItems = [
 export default function Layout({ children }) {
   const location = useLocation();
   const { setUser } = useApp();
+  const [narrowViewport, setNarrowViewport] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : true
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const apply = () => setNarrowViewport(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
+  const immersiveGraphRoute = location.pathname === "/connections" && narrowViewport;
 
   return (
-    <div className="app">
+    <div className={"app" + (immersiveGraphRoute ? " app--immersive-graph" : "")}>
       <header className="layout-header">
         <motion.div
           className="layout-header__inner"
@@ -35,9 +48,17 @@ export default function Layout({ children }) {
         </motion.div>
       </header>
 
-      <main className={"app__main " + (location.pathname === "/" ? "app__main--black" : "")}>{children}</main>
+      <main
+        className={
+          "app__main " +
+          (location.pathname === "/" ? "app__main--black " : "") +
+          (immersiveGraphRoute ? "app__main--immersive-graph" : "")
+        }
+      >
+        {children}
+      </main>
 
-      <nav className="layout-nav" aria-label="Main navigation">
+      <nav className={"layout-nav" + (immersiveGraphRoute ? " layout-nav--floating" : "")} aria-label="Main navigation">
         <motion.ul
           className="layout-nav__list"
           initial={{ opacity: 0 }}

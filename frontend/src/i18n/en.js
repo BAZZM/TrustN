@@ -46,6 +46,8 @@ const en = {
     moreSecondary: "more",
     reset: "Reset",
     you: "You",
+    sheetPullHint: "Details & requests",
+    resetZoom: "Reset zoom",
   },
   requests: {
     title: "Connection requests",

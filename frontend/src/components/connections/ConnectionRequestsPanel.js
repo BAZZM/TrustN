@@ -19,6 +19,7 @@ export default function ConnectionRequestsPanel({
   onRespond,
   respondingId,
   t,
+  panelClassName = "",
 }) {
   const requestCount = requests.length;
   const reduceMotion = useReducedMotion();
@@ -29,7 +30,7 @@ export default function ConnectionRequestsPanel({
     requestCount > 0 ? t("requests.pendingToggleAria").replace("{count}", String(requestCount)) : null;
 
   return (
-    <section className="connections__requests-panel">
+    <section className={["connections__requests-panel", panelClassName].filter(Boolean).join(" ")}>
       <button
         type="button"
         className={

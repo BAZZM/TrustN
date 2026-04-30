@@ -23,8 +23,33 @@
   background-image: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(30, 30, 30, 0.6), transparent);
 }
 
+.app--immersive-graph {
+  min-height: 100dvh;
+}
+
+.app__main--immersive-graph {
+  padding: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overscroll-behavior: none;
+}
+
 @media (min-width: 768px) {
-  .app__main {
+  .app__main--immersive-graph {
+    padding: 0;
+    max-width: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .app__main:not(.app__main--immersive-graph) {
     padding: var(--space-xl);
     padding-bottom: var(--space-xl);
     max-width: min(100%, 720px);
@@ -34,7 +59,7 @@
 }
 
 @media (min-width: 1024px) {
-  .app__main {
+  .app__main:not(.app__main--immersive-graph) {
     max-width: min(100%, 860px);
   }
 }
