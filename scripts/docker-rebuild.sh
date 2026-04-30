@@ -18,4 +18,4 @@ docker compose build --no-cache
 echo "Starting services..."
 docker compose up -d
 
-echo "Done. Backend: http://localhost:3000  Frontend: http://localhost:80  DB: localhost:5432"
+echo "Done. Backend: http://localhost:3000  Frontend: http://localhost:80  DB: localhost:5433"

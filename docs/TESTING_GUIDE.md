@@ -9,7 +9,7 @@ Use this guide to verify the application after the security hardening release. T
 - **Build status**: All services built and running.
 - **URLs** (when using Docker as set up):
   - **Web app (desktop or phone)**: `http://localhost` (or your host IP if testing from another device).
-  - **API (direct)**: `http://localhost:3000` (backend only; frontend proxies `/api/` to this).
+  - **API (direct)**: `http://localhost:3000` (Docker/backend on host). With CRA dev + local Node API, requests proxy `/api/` to port 5000 per `frontend/package.json`.
 - **From a phone on the same network**: Use `http://<your-PC-IP>` (e.g. `http://192.168.1.100`). Ensure port 80 is reachable and the frontend container is bound to `0.0.0.0:80`.
 
 ---

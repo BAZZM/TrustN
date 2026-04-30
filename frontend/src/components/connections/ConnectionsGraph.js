@@ -312,6 +312,20 @@ export default function ConnectionsGraph({
   if (immersive) {
     return (
       <section className="connections__graph-shell connections__graph-shell--immersive">
+        <div
+          ref={viewportRef}
+          className="connections__graph-stage connections__graph-stage--immersive"
+          role="presentation"
+          onClick={() => {
+            if (consumeShouldIgnoreTap()) return;
+            onResetFocus();
+          }}
+        >
+          <div className="connections__pinch-inner" style={transformStyle}>
+            <div className="connections__svg-fit">{graphSvg}</div>
+          </div>
+        </div>
+
         <div className="connections__immersive-hud">
           <div className="connections__immersive-hud-top">
             <div className="connections__immersive-hud-copy">
@@ -337,25 +351,10 @@ export default function ConnectionsGraph({
         </div>
 
         <div
-          ref={viewportRef}
-          className="connections__graph-stage connections__graph-stage--immersive"
-          role="presentation"
-          onClick={() => {
-            if (consumeShouldIgnoreTap()) return;
-            onResetFocus();
-          }}
-        >
-          <div className="connections__pinch-inner" style={transformStyle}>
-            <div className="connections__svg-fit">{graphSvg}</div>
-          </div>
-        </div>
-
-        <div
           className={
             "connections__sheet" +
             (sheetOpen ? " connections__sheet--open" : "")
           }
-          style={{ bottom: "var(--floating-nav-clearance)" }}
         >
           <div className="connections__sheet-static">{focusCard}</div>
           <button

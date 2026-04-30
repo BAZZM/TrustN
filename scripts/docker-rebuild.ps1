@@ -21,4 +21,4 @@ docker compose build --no-cache
 Write-Host "Starting services..."
 docker compose up -d
 
-Write-Host "Done. Backend: http://localhost:3000  Frontend: http://localhost:80  DB: localhost:5432"
+Write-Host "Done. Backend: http://localhost:3000  Frontend: http://localhost:80  DB: localhost:5433"
