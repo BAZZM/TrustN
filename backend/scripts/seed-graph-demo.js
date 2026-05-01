@@ -7,12 +7,26 @@ require("dotenv").config({ path: path.join(__dirname, "../.env") });
 const fs = require("fs");
 const { Client } = require("pg");
 
+function resolveSeedSqlPath() {
+  const candidates = [
+    path.join(__dirname, "../../database/seed_connections_graph_demo.sql"),
+    path.join(__dirname, "../database/seed_connections_graph_demo.sql"),
+  ];
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (!found) {
+    throw new Error(
+      `seed_connections_graph_demo.sql not found. Tried:\n${candidates.join("\n")}`
+    );
+  }
+  return found;
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) {
     console.error("Set DATABASE_URL (e.g. in backend/.env) to your PostgreSQL connection string.");
     process.exit(1);
   }
-  const sqlPath = path.join(__dirname, "../../database/seed_connections_graph_demo.sql");
+  const sqlPath = resolveSeedSqlPath();
   const sql = fs.readFileSync(sqlPath, "utf8");
   const client = new Client({ connectionString: process.env.DATABASE_URL });
   await client.connect();
