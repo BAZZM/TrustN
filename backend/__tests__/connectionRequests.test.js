@@ -87,7 +87,7 @@ describe('POST /api/connection-requests/:id/respond', () => {
     expect(after.status).toBe('pending');
   });
 
-  test('approval order: target then intermediary -> connection created', async () => {
+  test('target cannot approve before intermediary (introduction queue)', async () => {
     const requester = await createUser({ name: 'Requester' });
     const target = await createUser({ name: 'Target' });
     const intermediary = await createUser({ name: 'Intermediary' });
@@ -104,30 +104,16 @@ describe('POST /api/connection-requests/:id/respond', () => {
       .post(`/api/connection-requests/${req.id}/respond`)
       .set(authHeader(target.id))
       .send({ action: 'approve_as_target' });
-    expect(r1.status).toBe(200);
+    expect(r1.status).toBe(400);
+    expect(r1.body.error).toMatch(/Intermediary must approve/i);
 
     let after = await getRequest(req.id);
-    expect(after.approved_by_target_at).not.toBeNull();
-    expect(after.approved_by_intermediary_at).toBeNull();
+    expect(after.approved_by_target_at).toBeNull();
     expect(after.status).toBe('pending');
     expect(await getConnectionBetween(requester.id, target.id)).toBeNull();
-
-    const r2 = await request(app)
-      .post(`/api/connection-requests/${req.id}/respond`)
-      .set(authHeader(intermediary.id))
-      .send({ action: 'approve_as_intermediary' });
-    expect(r2.status).toBe(200);
-
-    after = await getRequest(req.id);
-    expect(after.status).toBe('accepted');
-    expect(after.processed_at).not.toBeNull();
-
-    const conn = await getConnectionBetween(requester.id, target.id);
-    expect(conn).not.toBeNull();
-    expect(conn.circle_type).toBe('secondary');
   });
 
-  test('approval order: intermediary then target -> connection created (regression: was blocked by WITH CHECK)', async () => {
+  test('approval order: intermediary then target -> INNER acquired edge created', async () => {
     const requester = await createUser({ name: 'Requester' });
     const target = await createUser({ name: 'Target' });
     const intermediary = await createUser({ name: 'Intermediary' });
@@ -160,7 +146,8 @@ describe('POST /api/connection-requests/:id/respond', () => {
     expect(after.status).toBe('accepted');
     const conn = await getConnectionBetween(requester.id, target.id);
     expect(conn).not.toBeNull();
-    expect(conn.circle_type).toBe('secondary');
+    expect(conn.circle_type).toBe('inner');
+    expect(conn.introduced_via_request_id).toBe(req.id);
   });
 
   test('decline a secondary as intermediary marks declined (regression)', async () => {
@@ -205,6 +192,74 @@ describe('POST /api/connection-requests/:id/respond', () => {
       .set(authHeader(intermediary.id))
       .send({ action: 'approve_as_target' });
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/connection-requests', () => {
+  test('target inbox hides secondary intro until intermediary approves', async () => {
+    const requester = await createUser({ name: 'Requester' });
+    const target = await createUser({ name: 'Target' });
+    const intermediary = await createUser({ name: 'Intermediary' });
+    await createInnerConnection(requester.id, intermediary.id);
+    await createInnerConnection(intermediary.id, target.id);
+    const reqRow = await createPendingRequest({
+      requesterId: requester.id,
+      targetUserId: target.id,
+      intermediaryId: intermediary.id,
+      circleType: 'secondary',
+    });
+
+    let res = await request(app).get('/api/connection-requests').set(authHeader(target.id));
+    expect(res.status).toBe(200);
+    expect(res.body.requests || []).toHaveLength(0);
+
+    await request(app)
+      .post(`/api/connection-requests/${reqRow.id}/respond`)
+      .set(authHeader(intermediary.id))
+      .send({ action: 'approve_as_intermediary' });
+
+    res = await request(app).get('/api/connection-requests').set(authHeader(target.id));
+    expect(res.body.requests.length).toBe(1);
+  });
+
+  test('intermediary sees pending secondary in inbox immediately', async () => {
+    const requester = await createUser({ name: 'Requester' });
+    const target = await createUser({ name: 'Target' });
+    const intermediary = await createUser({ name: 'Intermediary' });
+    await createInnerConnection(requester.id, intermediary.id);
+    await createInnerConnection(intermediary.id, target.id);
+    await createPendingRequest({
+      requesterId: requester.id,
+      targetUserId: target.id,
+      intermediaryId: intermediary.id,
+      circleType: 'secondary',
+    });
+
+    const res = await request(app).get('/api/connection-requests').set(authHeader(intermediary.id));
+    expect(res.status).toBe(200);
+    expect(res.body.requests.length).toBe(1);
+  });
+
+  test('scope=all lists outbound pending for requester', async () => {
+    const requester = await createUser({ name: 'Requester' });
+    const target = await createUser({ name: 'Target' });
+    const intermediary = await createUser({ name: 'Intermediary' });
+    await createInnerConnection(requester.id, intermediary.id);
+    await createInnerConnection(intermediary.id, target.id);
+    await createPendingRequest({
+      requesterId: requester.id,
+      targetUserId: target.id,
+      intermediaryId: intermediary.id,
+      circleType: 'secondary',
+    });
+
+    const res = await request(app)
+      .get('/api/connection-requests?scope=all')
+      .set(authHeader(requester.id));
+
+    expect(res.status).toBe(200);
+    expect(res.body.inbox).toEqual([]);
+    expect(res.body.sent.length).toBe(1);
   });
 });
 

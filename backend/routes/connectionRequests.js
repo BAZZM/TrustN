@@ -3,11 +3,37 @@ const { pool, withUserContext } = require('../db');
 
 const router = express.Router();
 
-// Finalises a secondary request when both intermediary and target have approved.
-// Uses the SECURITY DEFINER function app_finalize_secondary which bypasses RLS
-// for the cross-user INSERT into connections (intermediary is not a participant
-// of the resulting requester<->target edge). The function is idempotent and
-// only finalises if the request is still pending and both approvals are set.
+const REQUEST_SELECT = `
+  SELECT ar.id, ar.requester_id, ar.target_user_id, ar.intermediary_id, ar.status, ar.note, ar.circle_type,
+         ar.approved_by_intermediary_at, ar.approved_by_target_at, ar.created_at,
+         ru.phone AS requester_phone, ru.name AS requester_name,
+         tu.phone AS target_phone, tu.name AS target_name,
+         iu.phone AS intermediary_phone, iu.name AS intermediary_name
+  FROM access_requests ar
+  JOIN users ru ON ru.id = ar.requester_id
+  LEFT JOIN users tu ON tu.id = ar.target_user_id
+  LEFT JOIN users iu ON iu.id = ar.intermediary_id
+`;
+
+/** Pending rows where the viewer must act (intermediary queue + target inbox after intermediary approval + inner requests to target). */
+const INBOX_WHERE = `
+  ar.status = 'pending'
+  AND (
+    (ar.intermediary_id = $1 AND ar.circle_type = 'secondary')
+    OR (ar.target_user_id = $1 AND ar.circle_type = 'inner')
+    OR (
+      ar.target_user_id = $1
+      AND ar.circle_type = 'secondary'
+      AND ar.approved_by_intermediary_at IS NOT NULL
+    )
+  )
+`;
+
+/** Outbound introductions still waiting on others. */
+const SENT_WHERE = `ar.status = 'pending' AND ar.requester_id = $1`;
+
+// Finalises a secondary introduction when both intermediary and target have approved.
+// Creates INNER edge with introduced_via_request_id; increments intermediary metric (see migration 013).
 async function finishSecondaryIfBothApproved(client, requestId) {
   await client.query('SELECT * FROM app_finalize_secondary($1)', [requestId]);
 }
@@ -19,22 +45,28 @@ router.get('/', async (req, res) => {
     const userIdInt = typeof userId === 'string' ? parseInt(userId, 10) : userId;
     if (isNaN(userIdInt)) return res.status(400).json({ error: 'Invalid user ID' });
 
-    const { rows } = await withUserContext(userIdInt, async (client) => {
-      return await client.query(
-        `SELECT ar.id, ar.requester_id, ar.target_user_id, ar.intermediary_id, ar.status, ar.note, ar.circle_type,
-                ar.approved_by_intermediary_at, ar.approved_by_target_at, ar.created_at,
-                ru.phone AS requester_phone, ru.name AS requester_name,
-                tu.phone AS target_phone, tu.name AS target_name,
-                iu.phone AS intermediary_phone, iu.name AS intermediary_name
-         FROM access_requests ar
-         JOIN users ru ON ru.id = ar.requester_id
-         LEFT JOIN users tu ON tu.id = ar.target_user_id
-         LEFT JOIN users iu ON iu.id = ar.intermediary_id
-         WHERE (ar.target_user_id = $1 OR ar.intermediary_id = $1) AND ar.status = 'pending'
-         ORDER BY ar.created_at DESC`,
-        [userIdInt]
+    const scope = String(req.query.scope || 'inbox').toLowerCase();
+
+    if (scope === 'all') {
+      const { rows: inbox } = await withUserContext(userIdInt, async (client) =>
+        client.query(`${REQUEST_SELECT} WHERE ${INBOX_WHERE} ORDER BY ar.created_at DESC`, [userIdInt])
       );
-    });
+      const { rows: sent } = await withUserContext(userIdInt, async (client) =>
+        client.query(`${REQUEST_SELECT} WHERE ${SENT_WHERE} ORDER BY ar.created_at DESC`, [userIdInt])
+      );
+      return res.json({ inbox, sent });
+    }
+
+    if (scope === 'sent') {
+      const { rows } = await withUserContext(userIdInt, async (client) =>
+        client.query(`${REQUEST_SELECT} WHERE ${SENT_WHERE} ORDER BY ar.created_at DESC`, [userIdInt])
+      );
+      return res.json({ requests: rows });
+    }
+
+    const { rows } = await withUserContext(userIdInt, async (client) =>
+      client.query(`${REQUEST_SELECT} WHERE ${INBOX_WHERE} ORDER BY ar.created_at DESC`, [userIdInt])
+    );
     res.json({ requests: rows });
   } catch (err) {
     console.error(err);
@@ -56,11 +88,6 @@ router.post('/', async (req, res) => {
 
     await withUserContext(requesterIdInt, async (client) => {
       if (cType === 'secondary') {
-        // Use SECURITY DEFINER helper so the requester can verify the
-        // intermediary<->target edge they are not a participant of.
-        // The function returns FALSE for any combination where either edge
-        // is missing (covers both "intermediary not in your inner circle"
-        // and "intermediary not in target inner circle").
         const check = await client.query(
           'SELECT app_can_intermediate($1, $2, $3) AS ok',
           [requesterIdInt, target_user_id, intermediary_id]
@@ -146,6 +173,9 @@ router.post('/:id/respond', async (req, res) => {
 
       if (action === 'approve_as_target') {
         if (uid !== String(r.target_user_id)) throw Object.assign(new Error('Not the target'), { status: 403 });
+        if (r.circle_type === 'secondary' && r.intermediary_id && !r.approved_by_intermediary_at) {
+          throw Object.assign(new Error('Intermediary must approve before you can accept'), { status: 400 });
+        }
         await client.query(
           'UPDATE access_requests SET approved_by_target_at = CURRENT_TIMESTAMP WHERE id = $1',
           [requestId]

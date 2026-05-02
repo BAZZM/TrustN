@@ -255,6 +255,14 @@ export default function Contacts() {
                 }
               }}
               onAddToSecondary={(item) => item && openAddToSecondary(item)}
+              onRequestIntroduction={(peer) =>
+                openAddToSecondary({
+                  user_id: peer.peer_id,
+                  user_name: peer.peer_name,
+                  phone: peer.peer_phone || "",
+                  job_role: peer.peer_job_role || "",
+                })
+              }
               fetchSecondaryForInnerCircle={fetchSecondaryConnectionsForInnerCircle}
               selectedInnerCircleUserId={selectedInnerCircleUserId}
               relationshipSecondaryConnections={relationshipSecondaryConnections}

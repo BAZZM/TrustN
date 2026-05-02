@@ -13,12 +13,46 @@ function contactInitial(c) {
   return contactName(c).charAt(0).toUpperCase();
 }
 
-function ContactChip({ contact, isSelected, onClick, circle }) {
+function RelationshipDiscoveryCard({ contact, onRequest, t }) {
+  const name = contactName(contact);
+  const job = contact.peer_job_role || "";
+  const exp = contact.peer_experience || "";
+  const meta = [job, exp].filter(Boolean).join(" · ");
+
+  return (
+    <motion.div
+      className="dial-discovery-card"
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.22 }}
+    >
+      <div className="dial-discovery-card__main">
+        <span className="dial-discovery-card__avatar">{contactInitial(contact)}</span>
+        <div className="dial-discovery-card__copy">
+          <span className="dial-discovery-card__name">{name}</span>
+          {meta ? <span className="dial-discovery-card__meta">{meta}</span> : null}
+        </div>
+      </div>
+      <motion.button
+        type="button"
+        className="dial-discovery-card__cta"
+        onClick={() => onRequest?.(contact)}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.97 }}
+      >
+        {t("contacts.requestIntroduction")}
+      </motion.button>
+    </motion.div>
+  );
+}
+
+function ContactChip({ contact, isSelected, onClick, circle, extraClassName = "" }) {
   const name = contactName(contact);
   return (
     <motion.button
       type="button"
-      className={`dial-chip ${isSelected ? "dial-chip--selected" : ""} dial-chip--${circle}`}
+      className={`dial-chip ${isSelected ? "dial-chip--selected" : ""} dial-chip--${circle} ${extraClassName}`.trim()}
       onClick={onClick}
       whileTap={{ scale: 0.95 }}
       layout
@@ -100,6 +134,7 @@ export default function DialContactScreen({
   onIndustryFilterChange,
   theme,
   t: tProp,
+  onRequestIntroduction,
 }) {
   const tFromHook = useTranslations("en");
   const t = tProp || tFromHook || ((key) => key);
@@ -210,6 +245,7 @@ export default function DialContactScreen({
                 key={c.peer_id || c.id}
                 contact={c}
                 circle="inner"
+                extraClassName={c.peer_introduced ? "dial-chip--acquired-inner" : ""}
                 isSelected={selectedContact === c}
                 onClick={() => handleSelectInner(c)}
               />
@@ -222,7 +258,9 @@ export default function DialContactScreen({
       {filteredSecondary.length > 0 && (
         <div className="dial-ring">
           <div className="dial-ring__header">
-            <span className="dial-ring__label">Secondary</span>
+            <span className="dial-ring__label">
+              {selectedInnerCircleUserId ? t("contacts.discoveryViaInner") : "Secondary"}
+            </span>
             <span className="dial-ring__count">{filteredSecondary.length}</span>
             {selectedInnerCircleUserId && (
               <div className="dial-ring__filters">
@@ -248,17 +286,30 @@ export default function DialContactScreen({
             )}
           </div>
           {loadingSecondary && <p className="dial-ring__loading">Loading…</p>}
-          <div className="dial-ring__list">
-            {filteredSecondary.map((c) => (
-              <ContactChip
-                key={c.peer_id || c.id}
-                contact={c}
-                circle="secondary"
-                isSelected={selectedContact === c}
-                onClick={() => handleSelectSecondary(c)}
-              />
-            ))}
-          </div>
+          {selectedInnerCircleUserId ? (
+            <div className="dial-discovery-list">
+              {filteredSecondary.map((c) => (
+                <RelationshipDiscoveryCard
+                  key={c.peer_id || c.id}
+                  contact={c}
+                  onRequest={onRequestIntroduction}
+                  t={t}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="dial-ring__list">
+              {filteredSecondary.map((c) => (
+                <ContactChip
+                  key={c.peer_id || c.id}
+                  contact={c}
+                  circle="secondary"
+                  isSelected={selectedContact === c}
+                  onClick={() => handleSelectSecondary(c)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

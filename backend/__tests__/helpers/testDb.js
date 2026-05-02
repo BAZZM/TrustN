@@ -26,6 +26,8 @@ const MIGRATION_ORDER = [
   'database/migrations/010_rls_connections_access_requests.sql',
   'database/migrations/011_connection_strength_computed.sql',
   'database/migrations/012_rls_fixups_and_helpers.sql',
+  'database/migrations/013_introduced_inner_connections.sql',
+  'database/migrations/014_remove_seed_pending_introduction_requests.sql',
 ];
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');

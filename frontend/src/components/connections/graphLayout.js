@@ -34,6 +34,9 @@ export function normalizeGraphNode(item, fallbackCircleType = "secondary") {
   const strengthValue = Number(item?.strength);
   const strength = Number.isFinite(strengthValue) ? strengthValue : 0;
   const circleType = item?.circle_type === "inner" ? "inner" : fallbackCircleType;
+  const peerIntroduced = Boolean(
+    item?.peer_introduced ?? item?.introduced_via_request_id ?? item?.raw?.peer_introduced
+  );
 
   return {
     id: String(id),
@@ -52,6 +55,7 @@ export function normalizeGraphNode(item, fallbackCircleType = "secondary") {
     experience: item?.peer_experience ?? item?.experience ?? "",
     strength,
     circleType,
+    peerIntroduced,
     createdAt: item?.created_at ?? null,
     createdAtMs: toTimestamp(item?.created_at),
     raw: item,

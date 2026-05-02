@@ -19,10 +19,12 @@ function Node({
   labelClassName,
   onSelect,
   disabled = false,
+  selected = false,
   motionTransition,
   hitPadding = 10,
   tapSlop = 0,
 }) {
+  const rootClass = [className, selected ? `${className}--selected` : ""].filter(Boolean).join(" ");
   const downRef = useRef(null);
 
   function pointerDown(e) {
@@ -47,7 +49,7 @@ function Node({
 
   return (
     <motion.g
-      className={className}
+      className={rootClass}
       initial={false}
       animate={{ x: node.x, y: node.y, opacity: node.opacity ?? 1, scale: node.scale ?? 1 }}
       transition={motionTransition}
@@ -97,6 +99,11 @@ export default function ConnectionsGraph({
   onFocusConnection,
   onResetFocus,
   onFocusOverflow,
+  onSelectSecondary,
+  onSecondaryQuickAdd,
+  pendingIntroTargetIds = null,
+  selectedSecondaryId,
+  focusExtras = null,
   t,
   immersive = false,
   statsSummary = null,
@@ -149,6 +156,13 @@ export default function ConnectionsGraph({
       aria-label={t("connections.graphTitle")}
     >
       <rect width={GRAPH_VIEWBOX} height={GRAPH_VIEWBOX} fill="transparent" />
+      <defs>
+        <linearGradient id="connections-quickadd-bevel" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.38)" />
+          <stop offset="42%" stopColor="rgba(188,162,248,0.32)" />
+          <stop offset="100%" stopColor="rgba(120,90,190,0.26)" />
+        </linearGradient>
+      </defs>
       <circle cx={GRAPH_CENTER} cy={GRAPH_CENTER} r="144" className="connections__guide-ring" />
       <circle
         cx={GRAPH_CENTER}
@@ -201,20 +215,6 @@ export default function ConnectionsGraph({
           </text>
         )}
 
-      {secondaryLayout.map((node) => (
-        <Node
-          key={`secondary-node-${node.id}`}
-          node={node}
-          label={node.name}
-          className="connections__secondary-node"
-          labelClassName="connections__secondary-label"
-          disabled
-          motionTransition={nodeMotionTransition}
-          hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
-          tapSlop={0}
-        />
-      ))}
-
       <g className="connections__center-node">
         <circle cx={GRAPH_CENTER} cy={GRAPH_CENTER} r="48" className="connections__center-glow" />
         <circle cx={GRAPH_CENTER} cy={GRAPH_CENTER} r="34" className="connections__center-core" />
@@ -231,7 +231,10 @@ export default function ConnectionsGraph({
           key={`inner-node-${node.id}`}
           node={node}
           label={node.name}
-          className="connections__inner-node"
+          className={
+            "connections__inner-node" +
+            (node.peerIntroduced ? " connections__inner-node--acquired" : "")
+          }
           labelClassName="connections__inner-label"
           onSelect={onFocusConnection}
           motionTransition={nodeMotionTransition}
@@ -239,6 +242,60 @@ export default function ConnectionsGraph({
           tapSlop={tapSlop}
         />
       ))}
+
+      {secondaryLayout.map((node) => {
+        const targetKey = node.rawId != null ? String(node.rawId) : "";
+        const hasPendingLookup =
+          pendingIntroTargetIds &&
+          typeof pendingIntroTargetIds.has === "function" &&
+          targetKey;
+        const tripletPending = hasPendingLookup ? pendingIntroTargetIds.has(targetKey) : false;
+        const showChip = Boolean(onSecondaryQuickAdd && !tripletPending);
+
+        return (
+          <g key={`secondary-wrap-${node.id}`} className="connections__secondary-branch">
+            <Node
+              node={node}
+              label={node.name}
+              className="connections__secondary-node"
+              labelClassName="connections__secondary-label"
+              onSelect={onSelectSecondary}
+              disabled={!onSelectSecondary}
+              selected={Boolean(selectedSecondaryId && selectedSecondaryId === node.id)}
+              motionTransition={nodeMotionTransition}
+              hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
+              tapSlop={immersive ? tapSlop : 0}
+            />
+            {showChip ? (
+              <g
+                role="button"
+                tabIndex={0}
+                aria-label={t("connections.graphQuickAddAria")}
+                className="connections__secondary-quickadd"
+                transform={`translate(${node.x + node.radius * 0.92}, ${node.y - node.radius * 0.92})`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSecondaryQuickAdd(node);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSecondaryQuickAdd(node);
+                  }
+                }}
+              >
+                <circle r={14} className="connections__secondary-quickadd-hit" />
+                <circle r={8} className="connections__secondary-quickadd-face" fill="url(#connections-quickadd-bevel)" />
+                <text textAnchor="middle" dominantBaseline="central" className="connections__secondary-quickadd-plus">
+                  +
+                </text>
+              </g>
+            ) : null}
+          </g>
+        );
+      })}
 
       {focusUserId && hiddenSecondaryCount > 0 && (
         <g className="connections__overflow-chip" transform={`translate(${GRAPH_CENTER} 30)`}>
@@ -279,6 +336,7 @@ export default function ConnectionsGraph({
               ? t("connections.loadingBranch")
               : t("connections.focusSummary").replace("{count}", String(secondaryConnections.length))}
           </p>
+          {focusExtras}
         </>
       )}
     </div>

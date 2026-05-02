@@ -316,3 +316,96 @@
     width: 140px;
   }
 }
+
+/* Introduced-via-inner-circle discovery cards */
+.dial-discovery-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm, 10px);
+  margin-top: var(--space-xs, 4px);
+}
+
+.dial-discovery-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md, 12px);
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 12px);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  opacity: 0.92;
+}
+
+.dial-discovery-card__main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dial-discovery-card__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  color: var(--color-text, #f0f0f0);
+}
+
+.dial-discovery-card__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dial-discovery-card__name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dial-discovery-card__meta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #888);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dial-discovery-card__cta {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: var(--radius-full, 9999px);
+  border: 1px solid rgba(232, 184, 109, 0.35);
+  background: linear-gradient(145deg, rgba(232, 184, 109, 0.18), rgba(232, 184, 109, 0.06));
+  color: var(--color-accent, #e8b86d);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dial-discovery-card__cta:active {
+  opacity: 0.9;
+}
+
+.dial-chip--acquired-inner {
+  opacity: 0.88;
+  border-left-color: rgba(180, 205, 245, 0.55);
+}
+
+.dial-chip--acquired-inner .dial-chip__avatar {
+  background: rgba(180, 205, 245, 0.12);
+  color: rgba(220, 232, 252, 0.95);
+}

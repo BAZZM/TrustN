@@ -99,52 +99,8 @@ BEGIN
   END IF;
 END $$;
 
--- Create pending secondary circle requests (some approved by intermediary, some by target, some neither)
--- John requests users 26-30 via various intermediaries
-DO $$
-DECLARE
-  john_id INTEGER;
-  alice_id INTEGER;
-  bob_id INTEGER;
-  charlie_id INTEGER;
-  target_ids INTEGER[];
-BEGIN
-  SELECT id INTO john_id FROM users WHERE phone = '+1234567890';
-  SELECT id INTO alice_id FROM users WHERE phone = '+1000000001';
-  SELECT id INTO bob_id FROM users WHERE phone = '+1000000002';
-  SELECT id INTO charlie_id FROM users WHERE phone = '+1000000003';
-  IF john_id IS NOT NULL THEN
-    -- Request 26 (Zoe) via Alice - both approved (will auto-accept)
-    INSERT INTO access_requests (requester_id, target_user_id, intermediary_id, status, circle_type, approved_by_intermediary_at, approved_by_target_at)
-    SELECT john_id, u.id, alice_id, 'pending', 'secondary', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-    FROM users u WHERE u.phone = '+1000000026'
-    ON CONFLICT DO NOTHING;
-    
-    -- Request 27 (Adam) via Bob - intermediary approved, target pending
-    INSERT INTO access_requests (requester_id, target_user_id, intermediary_id, status, circle_type, approved_by_intermediary_at)
-    SELECT john_id, u.id, bob_id, 'pending', 'secondary', CURRENT_TIMESTAMP
-    FROM users u WHERE u.phone = '+1000000027'
-    ON CONFLICT DO NOTHING;
-    
-    -- Request 28 (Bella) via Charlie - target approved, intermediary pending
-    INSERT INTO access_requests (requester_id, target_user_id, intermediary_id, status, circle_type, approved_by_target_at)
-    SELECT john_id, u.id, charlie_id, 'pending', 'secondary', CURRENT_TIMESTAMP
-    FROM users u WHERE u.phone = '+1000000028'
-    ON CONFLICT DO NOTHING;
-    
-    -- Request 29 (Chris) via Alice - neither approved
-    INSERT INTO access_requests (requester_id, target_user_id, intermediary_id, status, circle_type)
-    SELECT john_id, u.id, alice_id, 'pending', 'secondary'
-    FROM users u WHERE u.phone = '+1000000029'
-    ON CONFLICT DO NOTHING;
-    
-    -- Request 30 (Dana) via Bob - neither approved
-    INSERT INTO access_requests (requester_id, target_user_id, intermediary_id, status, circle_type)
-    SELECT john_id, u.id, bob_id, 'pending', 'secondary'
-    FROM users u WHERE u.phone = '+1000000030'
-    ON CONFLICT DO NOTHING;
-  END IF;
-END $$;
+-- Pending introduction fixtures for John were removed: they polluted real introduction queues.
+-- Use migration 014_remove_seed_pending_introduction_requests.sql on existing DBs to delete legacy rows.
 
 -- Ensure John exists (create if not present from schema.sql seed)
 INSERT INTO users (phone, name, job_role, industry, experience) VALUES

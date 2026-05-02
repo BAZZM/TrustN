@@ -82,7 +82,7 @@ If these pass, the stack and auth gate are working.
 
 1. Go to **Connections**.
 2. Your connections (inner/secondary) load.
-3. **Connection requests**: If you have pending requests (as target or intermediary), they appear. You can **accept**, **decline**, or (for secondary) **approve as intermediary** / **approve as target**.
+3. **Connection requests**: Pending items you must act on (**inbox**) appear for **targets** (inner requests; secondary introductions only after the intermediary has approved) and for **intermediaries** on secondary flows. Outbound pending (**sent**) shows what you requested and whether it is waiting on the intermediary vs the target (`GET /api/connection-requests?scope=all`). You can **accept**, **decline**, or (for secondary introductions) **approve as intermediary** then **approve as target** in that order.
 
 **Expected:** All data is for the logged-in user only; no `user_id` in the requests.
 

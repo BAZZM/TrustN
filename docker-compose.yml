@@ -29,6 +29,8 @@ services:
       - ./database/migrations/010_rls_connections_access_requests.sql:/docker-entrypoint-initdb.d/11_rls_connections_access_requests.sql:ro
       - ./database/migrations/011_connection_strength_computed.sql:/docker-entrypoint-initdb.d/12_connection_strength_computed.sql:ro
       - ./database/migrations/012_rls_fixups_and_helpers.sql:/docker-entrypoint-initdb.d/13_rls_fixups_and_helpers.sql:ro
+      - ./database/migrations/013_introduced_inner_connections.sql:/docker-entrypoint-initdb.d/14_introduced_inner_connections.sql:ro
+      - ./database/migrations/014_remove_seed_pending_introduction_requests.sql:/docker-entrypoint-initdb.d/15_remove_seed_pending_introduction_requests.sql:ro
     ports:
       - "5433:5432"
     healthcheck:
@@ -91,6 +93,8 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
+      # Same nginx site on 8080 — use this in Cursor Simple Browser if :3000 shows API-only JSON
+      - "8080:80"
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://127.0.0.1:80/health || exit 1"]
       interval: 30s

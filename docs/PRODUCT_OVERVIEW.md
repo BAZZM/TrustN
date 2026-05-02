@@ -17,7 +17,7 @@ Copy-paste–ready description of what the application does today, plus an entit
 
 ### Core product concept: two circles
 
-- **`connections`** rows link two users with **`circle_type`**: **`inner`** (first circle) or **`secondary`** (second circle). Pairs are stored with **`user1_id < user2_id`** and a **`strength`** score (maintained by DB logic: shared inner peers and account age).
+- **`connections`** rows link two users with **`circle_type`**: **`inner`** (first circle) or **`secondary`** (second circle). Pairs are stored with **`user1_id < user2_id`** and a **`strength`** score (maintained by DB logic: shared inner peers and account age). Introductions that complete through dual approval are stored as **`inner`** edges with optional **`introduced_via_request_id`** (FK to **`access_requests`**) so the API/UI can treat them as **acquired inner** (lighter graph styling).
 - Users see their own edges under **row-level security** (`app.user_id`); cross-user flows (e.g. proving an intermediary sits between requester and target, or listing another user’s inner peers for secondary discovery) use **narrow `SECURITY DEFINER` SQL functions** (`app_can_intermediate`, `app_finalize_secondary`, `app_secondary_for`, etc.) so authorization stays in the database.
 
 ### Contacts
@@ -26,8 +26,9 @@ Copy-paste–ready description of what the application does today, plus an entit
 
 ### Introductions / requests
 
-- **`access_requests`** model **connection requests**: **requester**, **target**, optional **intermediary**, **`circle_type`** (`inner` or `secondary`), **status** (`pending`, `accepted`, `declined`, etc.), **dual-approval timestamps** for secondary (`approved_by_intermediary_at`, `approved_by_target_at`).
-- API: create request, list pending (for target/intermediary), **respond** with `accept` / `decline` / `approve_as_intermediary` / `approve_as_target`. Inner requests can finalize with a direct accept; secondary requests require **both** approvals, then a **`secondary`** `connections` row is created via the definer function.
+- **`access_requests`** model **connection requests**: **requester**, **target**, optional **intermediary**, **`circle_type`** (`inner` or `secondary`), **status** (`pending`, `accepted`, `declined`, etc.), **dual-approval timestamps** for secondary introductions (`approved_by_intermediary_at`, `approved_by_target_at`).
+- **Secondary introductions are strictly intermediary-first**: the **target** does not see the request in **`GET /api/connection-requests`** until **`approved_by_intermediary_at`** is set, and **`approve_as_target`** is rejected until then. After **both** approvals, **`app_finalize_secondary`** marks the request accepted and creates (or upgrades) an **`inner`** `connections` row with **`introduced_via_request_id`** set; the intermediary’s **`users.introductions_completed_count`** increments once per completed introduction.
+- API: **`POST /api/connection-requests`** creates a request; **`GET /api/connection-requests`** supports **`scope=inbox`** (default), **`sent`** (outbound pending for the requester), or **`scope=all`** (`{ inbox, sent }`). Respond with **`accept`** / **`decline`** / **`approve_as_intermediary`** / **`approve_as_target`**. Inner requests finalize with a direct **`accept`** on the target side (no intermediary).
 
 ### Profile and UX
 
@@ -119,6 +120,7 @@ erDiagram
     boolean high_contrast
     string locale
     boolean notifications_connection_requests
+    int introductions_completed_count
     timestamps profile_fields
   }
 
@@ -136,6 +138,7 @@ erDiagram
     int user2_id FK
     int strength
     string circle_type
+    int introduced_via_request_id FK
     timestamp created_at
   }
 
@@ -196,6 +199,6 @@ erDiagram
 
 ### Diagram notes
 
-- **`connections`** is a single table with **two FKs** to `users`; the app enforces **`user1_id < user2_id`**.
+- **`connections`** is a single table with **two FKs** to `users`; the app enforces **`user1_id < user2_id`**. When **`introduced_via_request_id`** is set, **`circle_type`** must be **`inner`** (introduction-acquired edges).
 - **`access_requests`** has **up to three** user FKs (requester, target, intermediary); intermediary is null for pure inner requests.
 - **`schema_version`** and **`locales`** are infrastructure/support tables, not business “actors.”
