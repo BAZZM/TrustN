@@ -10,24 +10,34 @@ const pool = new Pool({
 
 /**
  * Run callback with a client that has app.user_id and statement_timeout set (for RLS and safety).
+ * Uses session-level GUCs and RESET in `finally` so every query on this pooled connection sees the
+ * same user identity. (Autocommitted SET LOCAL clears after each standalone statement — empty graph
+ * on Fly — and wrapping the entire callback in BEGIN/COMMIT broke some UPDATE paths under test.)
  */
 async function withUserContext(userId, fn) {
   const client = await pool.connect();
   try {
-    // Convert userId to integer for RLS policy (user_id is INTEGER in DB)
     const userIdInt = typeof userId === 'string' ? parseInt(userId, 10) : userId;
     if (isNaN(userIdInt)) {
       throw new Error(`Invalid user_id: ${userId}`);
     }
-    // SET LOCAL doesn't support parameterized queries in all PostgreSQL versions
-    // Use pg_escape_literal or direct string interpolation (safe since we validated userIdInt)
-    await client.query(`SET LOCAL app.user_id = '${userIdInt}'`);
-    await client.query(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
+    await client.query(`SET app.user_id = '${userIdInt}'`);
+    await client.query(`SET statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
     return await fn(client);
   } catch (err) {
     console.error('withUserContext error:', err.message, 'userId:', userId);
     throw err;
   } finally {
+    try {
+      await client.query('RESET app.user_id');
+    } catch (_) {
+      /* custom GUC may be unset */
+    }
+    try {
+      await client.query('RESET statement_timeout');
+    } catch (_) {
+      /* ignore */
+    }
     client.release();
   }
 }
