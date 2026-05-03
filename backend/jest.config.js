@@ -3,7 +3,7 @@
  *
  * Tests run against a real PostgreSQL instance (the docker-compose `database`
  * service mapped to localhost:5433 by default). They create a dedicated test
- * database, apply migrations through `014_remove_seed_pending_introduction_requests.sql`, and drop it on teardown.
+ * database, apply migrations through `database/migrations/016_unified_secondary_fts.sql`, and drop it on teardown.
  *
  * Required env vars (with sensible defaults):
  *   TEST_PG_HOST     (default 127.0.0.1)

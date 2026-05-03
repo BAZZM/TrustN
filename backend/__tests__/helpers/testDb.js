@@ -28,6 +28,8 @@ const MIGRATION_ORDER = [
   'database/migrations/012_rls_fixups_and_helpers.sql',
   'database/migrations/013_introduced_inner_connections.sql',
   'database/migrations/014_remove_seed_pending_introduction_requests.sql',
+  'database/migrations/015_demonstration_graph_repair.sql',
+  'database/migrations/016_unified_secondary_fts.sql',
 ];
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');

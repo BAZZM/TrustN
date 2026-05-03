@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTranslations } from "../../i18n";
 import DialToolbar from "./DialToolbar";
 import { DIAL_CONFIG } from "./dialConfig";
+import UnifiedSecondarySearchBar from "../connections/UnifiedSecondarySearchBar";
 import "./DialContactScreen.css";
 
 function contactName(c) {
@@ -126,12 +127,11 @@ export default function DialContactScreen({
   onAddToSecondary,
   fetchSecondaryForInnerCircle,
   selectedInnerCircleUserId = null,
-  relationshipSecondaryConnections = [],
+  unifiedSecondaryConnections = [],
+  unifiedSearchValue = "",
+  onUnifiedSearchChange,
+  secondaryUsesUnifiedSearch = false,
   loadingSecondary = false,
-  jobFilterValue: jobFilterValueProp,
-  industryFilterValue: industryFilterValueProp,
-  onJobFilterChange,
-  onIndustryFilterChange,
   theme,
   t: tProp,
   onRequestIntroduction,
@@ -142,14 +142,6 @@ export default function DialContactScreen({
   const [search, setSearch] = useState("");
   const [selectedContact, setSelectedContact] = useState(null);
   const [selectedCircle, setSelectedCircle] = useState(null);
-  const [jobFilterLocal, setJobFilterLocal] = useState("");
-  const [industryFilterLocal, setIndustryFilterLocal] = useState("");
-
-  const jobFilterValue = jobFilterValueProp ?? jobFilterLocal;
-  const industryFilterValue = industryFilterValueProp ?? industryFilterLocal;
-  const setJobFilter = onJobFilterChange ?? setJobFilterLocal;
-  const setIndustryFilter = onIndustryFilterChange ?? setIndustryFilterLocal;
-
   const filteredInner = useMemo(() => {
     const q = (search || "").trim().toLowerCase();
     if (!q) return innerConnections;
@@ -160,18 +152,18 @@ export default function DialContactScreen({
     );
   }, [innerConnections, search]);
 
-  const secondaryToShow = selectedInnerCircleUserId ? relationshipSecondaryConnections : secondaryConnections;
-
   const filteredSecondary = useMemo(() => {
+    if (secondaryUsesUnifiedSearch) return unifiedSecondaryConnections || [];
+
+    const base = secondaryConnections;
     const q = (search || "").trim().toLowerCase();
-    if (!q) return secondaryToShow;
-    return secondaryToShow.filter((c) =>
+    if (!q) return base;
+    return base.filter((c) =>
       contactName(c).toLowerCase().includes(q) ||
       (c.peer_job_role?.toLowerCase().includes(q)) ||
       (c.peer_industry?.toLowerCase().includes(q))
     );
-  }, [secondaryToShow, search]);
-
+  }, [secondaryConnections, secondaryUsesUnifiedSearch, search, unifiedSecondaryConnections]);
   const filteredProspective = useMemo(() => {
     const q = (search || "").trim().toLowerCase();
     if (!q) return prospectiveContacts;
@@ -208,15 +200,10 @@ export default function DialContactScreen({
     onSelectContact?.(null);
   }, [onSelectContact]);
 
-  useEffect(() => {
-    if (!selectedInnerCircleUserId) return;
-    const timeout = setTimeout(() => {
-      if (fetchSecondaryForInnerCircle) fetchSecondaryForInnerCircle(selectedInnerCircleUserId);
-    }, DIAL_CONFIG.secondaryFilters.debounceMs);
-    return () => clearTimeout(timeout);
-  }, [jobFilterValue, industryFilterValue, selectedInnerCircleUserId, fetchSecondaryForInnerCircle]);
-
-  const hasAny = innerConnections.length > 0 || secondaryConnections.length > 0 || prospectiveContacts.length > 0;
+  const hasAny =
+    innerConnections.length > 0 ||
+    secondaryConnections.length > 0 ||
+    prospectiveContacts.length > 0;
 
   return (
     <section className="dial-contact-screen" aria-label="Dial contact view">
@@ -254,38 +241,33 @@ export default function DialContactScreen({
         </div>
       )}
 
-      {/* Secondary connections */}
-      {filteredSecondary.length > 0 && (
+      {/* Secondary / hybrid unified search */}
+      {(secondaryUsesUnifiedSearch || filteredSecondary.length > 0) && (
         <div className="dial-ring">
           <div className="dial-ring__header">
             <span className="dial-ring__label">
               {selectedInnerCircleUserId ? t("contacts.discoveryViaInner") : "Secondary"}
             </span>
             <span className="dial-ring__count">{filteredSecondary.length}</span>
-            {selectedInnerCircleUserId && (
-              <div className="dial-ring__filters">
-                <input
-                  type="text"
-                  id="dial-filter-job"
-                  name="dialFilterJob"
-                  placeholder="Job role…"
-                  className="dial-ring__filter"
-                  value={jobFilterValue}
-                  onChange={(e) => setJobFilter(e.target.value)}
-                />
-                <input
-                  type="text"
-                  id="dial-filter-industry"
-                  name="dialFilterIndustry"
-                  placeholder="Industry…"
-                  className="dial-ring__filter"
-                  value={industryFilterValue}
-                  onChange={(e) => setIndustryFilter(e.target.value)}
+            {secondaryUsesUnifiedSearch && onUnifiedSearchChange && (
+              <div className="dial-ring__filters dial-ring__filters--unified">
+                <UnifiedSecondarySearchBar
+                  id="contacts-radial-unified-secondary-search"
+                  value={unifiedSearchValue}
+                  onChange={onUnifiedSearchChange}
+                  placeholder={t("contacts.unifiedSecondaryPlaceholder")}
+                  ariaLabel={t("contacts.unifiedSecondaryAria")}
+                  className="dial-ring__unified-search"
                 />
               </div>
             )}
           </div>
           {loadingSecondary && <p className="dial-ring__loading">Loading…</p>}
+          {secondaryUsesUnifiedSearch && !loadingSecondary && filteredSecondary.length === 0 && (
+            <p className="dial-contact-screen__empty dial-contact-screen__empty--muted">
+              {t("contacts.unifiedSecondaryEmpty")}
+            </p>
+          )}
           {selectedInnerCircleUserId ? (
             <div className="dial-discovery-list">
               {filteredSecondary.map((c) => (

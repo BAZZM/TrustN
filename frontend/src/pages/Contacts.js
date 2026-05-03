@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import axios from "axios";
 import { useApp } from "../context/AppContext";
@@ -57,44 +57,54 @@ export default function Contacts() {
     return { innerConnections: inner, secondaryConnections: secondary, prospectiveContacts: prospective, connectedPeerIds: peerIds };
   }, [connections, contacts]);
 
-  // State for relationship-based secondary connections (when an inner circle contact is selected)
-  const [relationshipSecondaryConnections, setRelationshipSecondaryConnections] = useState([]);
+  /** Hybrid secondary-search results (discovery ∪ edges); scope via selected inner when set */
+  const [hybridSecondaryResults, setHybridSecondaryResults] = useState([]);
   const [selectedInnerCircleUserId, setSelectedInnerCircleUserId] = useState(null);
-  const [loadingSecondaryConnections, setLoadingSecondaryConnections] = useState(false);
-  const [secondaryJobFilter, setSecondaryJobFilter] = useState("");
-  const [secondaryIndustryFilter, setSecondaryIndustryFilter] = useState("");
+  const [loadingHybridSecondaries, setLoadingHybridSecondaries] = useState(false);
+  const [secondaryUnifiedSearchInput, setSecondaryUnifiedSearchInput] = useState("");
+  const [debouncedSecondaryUnifiedQuery, setDebouncedSecondaryUnifiedQuery] = useState("");
 
-  // Fetch secondary connections for a selected inner circle contact
-  const fetchSecondaryConnectionsForInnerCircle = useCallback(async (innerCircleUserId) => {
-    if (!innerCircleUserId || !user?.id) return;
-    setLoadingSecondaryConnections(true);
-    try {
-      const params = new URLSearchParams();
-      if (secondaryJobFilter) params.append('job_role', secondaryJobFilter);
-      if (secondaryIndustryFilter) params.append('industry', secondaryIndustryFilter);
-      const queryString = params.toString();
-      const suffix = queryString ? "?" + queryString : "";
-      const url = baseURL + "/api/connections/secondary-for/" + innerCircleUserId + suffix;
-      const response = await axios.get(url);
-      setRelationshipSecondaryConnections(response.data.secondaryConnections || []);
-      setSelectedInnerCircleUserId(innerCircleUserId);
-    } catch (err) {
-      console.error('Error fetching secondary connections:', err);
-      setRelationshipSecondaryConnections([]);
-      setSelectedInnerCircleUserId(null);
-    } finally {
-      setLoadingSecondaryConnections(false);
-    }
-  }, [user, baseURL, secondaryJobFilter, secondaryIndustryFilter]);
-
-  // Debounced effect for filter changes
   useEffect(() => {
-    if (!selectedInnerCircleUserId) return;
-    const timeoutId = setTimeout(() => {
-      fetchSecondaryConnectionsForInnerCircle(selectedInnerCircleUserId);
-    }, 300);
-    return () => clearTimeout(timeoutId);
-  }, [secondaryJobFilter, secondaryIndustryFilter, selectedInnerCircleUserId, fetchSecondaryConnectionsForInnerCircle]);
+    const tid = window.setTimeout(
+      () => setDebouncedSecondaryUnifiedQuery((secondaryUnifiedSearchInput || "").trim()),
+      320
+    );
+    return () => window.clearTimeout(tid);
+  }, [secondaryUnifiedSearchInput]);
+
+  useEffect(() => {
+    if (!user?.id || viewMode !== VIEW_RADIAL) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingHybridSecondaries(true);
+
+    const params = new URLSearchParams({ limit: "200" });
+    if (debouncedSecondaryUnifiedQuery) {
+      params.set("q", debouncedSecondaryUnifiedQuery);
+    }
+    if (selectedInnerCircleUserId != null) {
+      params.set("focused_inner_peer_id", String(selectedInnerCircleUserId));
+    }
+
+    axios
+      .get(`${baseURL}/api/connections/secondary-search?${params.toString()}`)
+      .then((res) => {
+        if (!cancelled) setHybridSecondaryResults(res.data.results || []);
+      })
+      .catch((err) => {
+        console.error("Contacts radial secondary-search error:", err.response?.status, err.response?.data);
+        if (!cancelled) setHybridSecondaryResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingHybridSecondaries(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseURL, debouncedSecondaryUnifiedQuery, selectedInnerCircleUserId, user?.id, viewMode]);
 
   function handleImport() {
     if (!user?.id || !importText.trim()) return;
@@ -240,18 +250,12 @@ export default function Contacts() {
                 setRadialSelected(item);
                 if (!item) {
                   setSelectedInnerCircleUserId(null);
-                  setRelationshipSecondaryConnections([]);
-                  setSecondaryJobFilter("");
-                  setSecondaryIndustryFilter("");
                   return;
                 }
                 if (item.peer_id && innerConnections.some((c) => c.peer_id === item.peer_id)) {
-                  fetchSecondaryConnectionsForInnerCircle(item.peer_id);
+                  setSelectedInnerCircleUserId(item.peer_id);
                 } else {
                   setSelectedInnerCircleUserId(null);
-                  setRelationshipSecondaryConnections([]);
-                  setSecondaryJobFilter("");
-                  setSecondaryIndustryFilter("");
                 }
               }}
               onAddToSecondary={(item) => item && openAddToSecondary(item)}
@@ -263,14 +267,15 @@ export default function Contacts() {
                   job_role: peer.peer_job_role || "",
                 })
               }
-              fetchSecondaryForInnerCircle={fetchSecondaryConnectionsForInnerCircle}
+              fetchSecondaryForInnerCircle={(id) =>
+                id != null ? setSelectedInnerCircleUserId(id) : setSelectedInnerCircleUserId(null)
+              }
               selectedInnerCircleUserId={selectedInnerCircleUserId}
-              relationshipSecondaryConnections={relationshipSecondaryConnections}
-              loadingSecondary={loadingSecondaryConnections}
-              jobFilterValue={secondaryJobFilter}
-              industryFilterValue={secondaryIndustryFilter}
-              onJobFilterChange={setSecondaryJobFilter}
-              onIndustryFilterChange={setSecondaryIndustryFilter}
+              unifiedSecondaryConnections={hybridSecondaryResults}
+              unifiedSearchValue={secondaryUnifiedSearchInput}
+              onUnifiedSearchChange={setSecondaryUnifiedSearchInput}
+              secondaryUsesUnifiedSearch
+              loadingSecondary={loadingHybridSecondaries}
               theme={theme}
               t={t}
             />

@@ -114,7 +114,10 @@
   font-weight: 600;
 }
 
-.connections__graph-summary,
+.connections__focus-search {
+  margin: 0.65rem 0 0.35rem;
+}
+
 .connections__focus-body,
 .connections__empty-copy {
   margin: 0;

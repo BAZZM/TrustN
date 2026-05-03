@@ -108,7 +108,7 @@ Skip to **§5** if `trustn-db`, `trustn-api`, and `trustn-web` already exist in 
    cd /path/to/trust-network-connections-rebuild
    flyctl deploy --config backend/fly.toml -a trustn-api --yes
   ```
-   The `**release_command**` runs `node scripts/db-bootstrap.js` once per deploy if the DB has no `public.users` table yet.
+   The `**release_command**` runs `node scripts/db-bootstrap.js` once per deploy if the DB has no `public.users` table yet. Subsequent deploys pick up new `database/migrations/*.sql` entries via `schema_version` (for example `016_unified_secondary_fts`: `user_search_vector`, trigger, `app_unified_secondary_search`, FTS backfill).
 6. **Deploy Web** — **must** use `**frontend/`** as the working directory so upload size stays small:
   ```bash
    cd frontend

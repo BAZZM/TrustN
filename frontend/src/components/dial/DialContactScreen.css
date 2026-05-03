@@ -74,6 +74,18 @@
   margin-left: auto;
 }
 
+.dial-ring__filters--unified {
+  flex: 1 0 100%;
+  margin-left: 0;
+  margin-top: 4px;
+}
+
+.dial-contact-screen__empty--muted {
+  padding: var(--space-sm, 8px) var(--space-md, 12px);
+  margin: 0;
+  text-align: left;
+}
+
 .dial-ring__filter {
   padding: 4px 8px;
   font-size: 0.75rem;

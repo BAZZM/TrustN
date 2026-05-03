@@ -1,0 +1,21 @@
+.trust-unified-secondary-search__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.18));
+  background: var(--color-surface-soft, rgba(255, 255, 255, 0.06));
+  color: var(--color-text, #fff);
+  font: inherit;
+  outline: none;
+}
+
+.trust-unified-secondary-search__input:focus {
+  border-color: rgba(188, 162, 248, 0.55);
+  box-shadow: 0 0 0 2px rgba(138, 100, 220, 0.2);
+}
+
+.trust-unified-secondary-search__input::placeholder {
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.45));
+}

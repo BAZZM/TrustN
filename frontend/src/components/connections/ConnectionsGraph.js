@@ -104,6 +104,7 @@ export default function ConnectionsGraph({
   pendingIntroTargetIds = null,
   selectedSecondaryId,
   focusExtras = null,
+  focusSearchSlot = null,
   t,
   immersive = false,
   statsSummary = null,
@@ -336,6 +337,11 @@ export default function ConnectionsGraph({
               ? t("connections.loadingBranch")
               : t("connections.focusSummary").replace("{count}", String(secondaryConnections.length))}
           </p>
+          {focusSearchSlot ? (
+            <div className="connections__focus-search" onClick={(e) => e.stopPropagation()}>
+              {focusSearchSlot}
+            </div>
+          ) : null}
           {focusExtras}
         </>
       )}

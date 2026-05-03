@@ -53,6 +53,19 @@ async function createInnerConnection(userAId, userBId) {
   return rows[0];
 }
 
+async function createSecondaryConnection(userAId, userBId, strength = 1) {
+  const u1 = Math.min(userAId, userBId);
+  const u2 = Math.max(userAId, userBId);
+  const { rows } = await pool.query(
+    `INSERT INTO connections (user1_id, user2_id, circle_type, strength)
+     VALUES ($1, $2, 'secondary', $3)
+     ON CONFLICT (user1_id, user2_id) DO UPDATE SET circle_type = 'secondary', strength = EXCLUDED.strength
+     RETURNING id, user1_id, user2_id, circle_type, strength`,
+    [u1, u2, strength]
+  );
+  return rows[0];
+}
+
 async function createPendingRequest({ requesterId, targetUserId, intermediaryId = null, circleType = 'inner', note = null }) {
   const { rows } = await pool.query(
     `INSERT INTO access_requests (requester_id, target_user_id, intermediary_id, status, circle_type, note)
@@ -82,6 +95,7 @@ module.exports = {
   resetDynamicData,
   createUser,
   createInnerConnection,
+  createSecondaryConnection,
   createPendingRequest,
   getRequest,
   getConnectionBetween,

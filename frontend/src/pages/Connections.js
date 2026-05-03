@@ -11,6 +11,7 @@ import {
   normalizeGraphNode,
   sortConnectionsByPriority,
 } from "../components/connections/graphLayout";
+import UnifiedSecondarySearchBar from "../components/connections/UnifiedSecondarySearchBar";
 import "./Connections.css";
 
 export default function Connections() {
@@ -36,8 +37,10 @@ export default function Connections() {
   const [requestsOpen, setRequestsOpen] = useState(false);
   const [respondingId, setRespondingId] = useState(null);
   const [focusUserId, setFocusUserId] = useState(null);
-  const [secondaryByInnerId, setSecondaryByInnerId] = useState({});
-  const [secondaryLoadingFor, setSecondaryLoadingFor] = useState(null);
+  const [unifiedSecondaryRows, setUnifiedSecondaryRows] = useState([]);
+  const [secondaryUnifiedLoading, setSecondaryUnifiedLoading] = useState(false);
+  const [secondarySearchInput, setSecondarySearchInput] = useState("");
+  const [debouncedSecondaryQuery, setDebouncedSecondaryQuery] = useState("");
   const [pickedSecondaryId, setPickedSecondaryId] = useState(null);
   const [introRequestSending, setIntroRequestSending] = useState(false);
   const [introRequestError, setIntroRequestError] = useState(null);
@@ -121,12 +124,18 @@ export default function Connections() {
       return [];
     }
 
-    const items = secondaryByInnerId[focusUserId] || [];
-
-    return sortConnectionsByPriority(
-      items.map((item) => normalizeGraphNode(item, "secondary")).filter(Boolean)
-    );
-  }, [focusUserId, secondaryByInnerId]);
+    return (unifiedSecondaryRows || [])
+      .map((item) =>
+        normalizeGraphNode(
+          {
+            ...item,
+            peer_introduced: Array.isArray(item.sources) ? item.sources.includes("edge") : false,
+          },
+          "secondary"
+        )
+      )
+      .filter(Boolean);
+  }, [focusUserId, unifiedSecondaryRows]);
 
   const pickedSecondary = useMemo(
     () => secondaryConnections.find((s) => s.id === pickedSecondaryId) || null,
@@ -164,59 +173,78 @@ export default function Connections() {
     }
   }, [focusUserId, innerConnections]);
 
-  const fetchSecondaryConnections = useCallback(
-    async (innerNode) => {
-      if (!innerNode?.rawId) {
-        return;
-      }
+  useEffect(() => {
+    const t = window.setTimeout(
+      () => setDebouncedSecondaryQuery((secondarySearchInput || "").trim()),
+      320
+    );
+    return () => window.clearTimeout(t);
+  }, [secondarySearchInput]);
 
-      const cacheKey = String(innerNode.id);
-      setSecondaryLoadingFor(cacheKey);
+  useEffect(() => {
+    if (!focusUserId || !focusedConnection?.rawId) {
+      setUnifiedSecondaryRows([]);
+      setSecondaryUnifiedLoading(false);
+      return;
+    }
 
-      try {
-        const response = await axios.get(
-          `${baseURL}/api/connections/secondary-for/${innerNode.rawId}`
-        );
+    const focusInner = focusedConnection.rawId;
+    let cancelled = false;
 
-        setSecondaryByInnerId((current) => ({
-          ...current,
-          [cacheKey]: response.data.secondaryConnections || [],
-        }));
-      } catch {
-        setSecondaryByInnerId((current) => ({
-          ...current,
-          [cacheKey]: [],
-        }));
-      } finally {
-        setSecondaryLoadingFor((current) => (current === cacheKey ? null : current));
-      }
-    },
-    [baseURL]
-  );
+    setSecondaryUnifiedLoading(true);
 
-  const handleFocusConnection = useCallback(
-    (innerNode) => {
-      setPickedSecondaryId(null);
-      setIntroRequestError(null);
-      if (!innerNode) {
-        setFocusUserId(null);
-        return;
-      }
+    const params = new URLSearchParams({
+      limit: "200",
+      focused_inner_peer_id: String(focusInner),
+    });
+    if (debouncedSecondaryQuery) {
+      params.set("q", debouncedSecondaryQuery);
+    }
 
-      const cacheKey = String(innerNode.id);
-      setFocusUserId(cacheKey);
+    axios
+      .get(`${baseURL}/api/connections/secondary-search?${params.toString()}`)
+      .then((res) => {
+        if (!cancelled) {
+          setUnifiedSecondaryRows(res.data?.results || []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUnifiedSecondaryRows([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSecondaryUnifiedLoading(false);
+        }
+      });
 
-      if (!secondaryByInnerId[cacheKey]) {
-        fetchSecondaryConnections(innerNode);
-      }
-    },
-    [fetchSecondaryConnections, secondaryByInnerId]
-  );
+    return () => {
+      cancelled = true;
+    };
+  }, [baseURL, debouncedSecondaryQuery, focusUserId, focusedConnection?.rawId]);
+
+  const handleFocusConnection = useCallback((innerNode) => {
+    setPickedSecondaryId(null);
+    setIntroRequestError(null);
+    setSecondarySearchInput("");
+    setDebouncedSecondaryQuery("");
+    if (!innerNode) {
+      setFocusUserId(null);
+      return;
+    }
+
+    const cacheKey = String(innerNode.id);
+    setFocusUserId(cacheKey);
+  }, []);
 
   const handleResetFocus = useCallback(() => {
     setFocusUserId(null);
     setPickedSecondaryId(null);
     setIntroRequestError(null);
+    setSecondarySearchInput("");
+    setDebouncedSecondaryQuery("");
+    setUnifiedSecondaryRows([]);
   }, []);
 
   const handleSecondarySelect = useCallback((node) => {
@@ -299,7 +327,7 @@ export default function Connections() {
     ];
   }, [innerConnections.length, requestInbox.length, requestSent.length, t, visibleInnerConnections.length]);
 
-  const isSecondaryLoading = Boolean(focusUserId && secondaryLoadingFor === focusUserId);
+  const isSecondaryLoading = Boolean(focusUserId && secondaryUnifiedLoading);
   const showTrustGraph = !loading && innerConnections.length > 0;
   const immersiveGraph = showTrustGraph && narrowViewport;
   const needsDockClearance =
@@ -330,9 +358,35 @@ export default function Connections() {
     </motion.header>
   );
 
+  const focusSearchSlot = focusedConnection ? (
+    <UnifiedSecondarySearchBar
+      key={`connections-unified-secondary-${focusUserId}`}
+      id="connections-unified-secondary-search"
+      value={secondarySearchInput}
+      onChange={setSecondarySearchInput}
+      placeholder={t("connections.unifiedSecondaryPlaceholder")}
+      ariaLabel={t("connections.unifiedSecondaryAria")}
+    />
+  ) : null;
+
   const focusExtras = useMemo(() => {
-    if (!focusedConnection || isSecondaryLoading) return null;
-    if (secondaryConnections.length === 0) return null;
+    if (!focusedConnection) return null;
+
+    if (isSecondaryLoading) {
+      return (
+        <div ref={discoveryRef} className="connections__discovery">
+          <p className="connections__discovery-hint">{t("connections.loadingBranch")}</p>
+        </div>
+      );
+    }
+
+    if (secondaryConnections.length === 0) {
+      return (
+        <div ref={discoveryRef} className="connections__discovery">
+          <p className="connections__discovery-hint">{t("connections.noSecondaryUnified")}</p>
+        </div>
+      );
+    }
 
     return (
       <div ref={discoveryRef} className="connections__discovery">
@@ -428,6 +482,7 @@ export default function Connections() {
     pendingIntroTargetIds,
     selectedSecondaryId: pickedSecondaryId,
     focusExtras,
+    focusSearchSlot,
     t,
   };
 

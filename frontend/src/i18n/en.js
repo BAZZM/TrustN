@@ -57,6 +57,9 @@ const en = {
     requestDiscussionSoon: "Coming soon",
     introPendingWireframe: "Intro pending",
     graphQuickAddAria: "Select for introduction",
+    unifiedSecondaryPlaceholder: "Search by name, role, industry, experience",
+    unifiedSecondaryAria: "Search discoverable secondaries",
+    noSecondaryUnified: "No matching people in this branch. Try a different search or pick another inner connection.",
   },
   requests: {
     title: "Introduction requests",
@@ -101,6 +104,9 @@ const en = {
     searchPlaceholder: "Search by name or phone",
     requestIntroduction: "Request intro",
     discoveryViaInner: "Via your inner circle",
+    unifiedSecondaryPlaceholder: "Search discoverable secondaries",
+    unifiedSecondaryAria: "Full-text search over name, role, industry, and experience",
+    unifiedSecondaryEmpty: "No matching secondaries yet. Adjust your search or pick an inner contact.",
   },
   settings: {
     title: "Settings",
