@@ -60,6 +60,10 @@ const en = {
     unifiedSecondaryPlaceholder: "Search by name, role, industry, experience",
     unifiedSecondaryAria: "Search discoverable secondaries",
     noSecondaryUnified: "No matching people in this branch. Try a different search or pick another inner connection.",
+    introNotEligibleViaIntermediary:
+      "{intermediary} doesn’t share an inner-circle connection with {target}, so an introduction can’t be routed through them. Choose someone in their inner circle, or focus another trusted contact.",
+    introRequestDisabledTitle:
+      "Introductions require this person to be in the focused contact’s inner circle",
   },
   requests: {
     title: "Introduction requests",

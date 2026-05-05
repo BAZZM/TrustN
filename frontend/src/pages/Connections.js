@@ -14,6 +14,16 @@ import {
 import UnifiedSecondarySearchBar from "../components/connections/UnifiedSecondarySearchBar";
 import "./Connections.css";
 
+/** True iff unified-search row lists focused inner in via_inner_peer_ids (discovery path); matches app_can_intermediate. */
+function secondaryIntroEligibleViaFocusedInner(graphNode, focusedInnerRawId) {
+  if (!graphNode?.raw || focusedInnerRawId == null) return false;
+  const inner = Number(focusedInnerRawId);
+  if (!Number.isFinite(inner)) return false;
+  const vias = graphNode.raw.via_inner_peer_ids;
+  if (!Array.isArray(vias) || vias.length === 0) return false;
+  return vias.some((id) => Number(id) === inner);
+}
+
 export default function Connections() {
   const location = useLocation();
   const { user, baseURL } = useApp();
@@ -142,6 +152,11 @@ export default function Connections() {
     [pickedSecondaryId, secondaryConnections]
   );
 
+  const pickedIntroEligible = useMemo(() => {
+    if (!pickedSecondary || focusedConnection?.rawId == null) return false;
+    return secondaryIntroEligibleViaFocusedInner(pickedSecondary, focusedConnection.rawId);
+  }, [pickedSecondary, focusedConnection?.rawId]);
+
   /** Targets (peer ids) with a pending secondary intro you sent via the currently focused inner peer. */
   const pendingIntroTargetIds = useMemo(() => {
     const set = new Set();
@@ -265,6 +280,7 @@ export default function Connections() {
 
   const sendIntroductionRequest = useCallback(() => {
     if (!user?.id || !focusedConnection?.rawId || !pickedSecondary?.rawId) return;
+    if (!secondaryIntroEligibleViaFocusedInner(pickedSecondary, focusedConnection.rawId)) return;
     if (pendingIntroTargetIds.has(String(pickedSecondary.rawId))) return;
     setIntroRequestSending(true);
     setIntroRequestError(null);
@@ -290,6 +306,7 @@ export default function Connections() {
     pendingIntroTargetIds,
     pickedSecondary,
     user?.id,
+    focusedConnection?.rawId,
   ]);
 
   function respondToRequest(requestId, action) {
@@ -402,9 +419,13 @@ export default function Connections() {
               </span>
             </div>
             <p className="connections__discovery-copy">
-              {t("connections.discoveryBody")
-                .replace("{intermediary}", focusedConnection.name)
-                .replace("{target}", pickedSecondary.name)}
+              {pickedIntroEligible
+                ? t("connections.discoveryBody")
+                    .replace("{intermediary}", focusedConnection.name)
+                    .replace("{target}", pickedSecondary.name)
+                : t("connections.introNotEligibleViaIntermediary")
+                    .replace("{intermediary}", focusedConnection.name)
+                    .replace("{target}", pickedSecondary.name)}
             </p>
             {introRequestError ? (
               <p className="connections__discovery-error" role="alert">
@@ -431,6 +452,11 @@ export default function Connections() {
                 <button
                   type="button"
                   className="connections__discovery-actions-btn connections__discovery-actions-btn--primary"
+                  disabled={!pickedIntroEligible}
+                  aria-disabled={!pickedIntroEligible}
+                  title={
+                    pickedIntroEligible ? undefined : t("connections.introRequestDisabledTitle")
+                  }
                   onClick={(e) => {
                     e.stopPropagation();
                     sendIntroductionRequest();
@@ -460,6 +486,7 @@ export default function Connections() {
     introRequestSending,
     isSecondaryLoading,
     isTripletIntroPending,
+    pickedIntroEligible,
     pickedSecondary,
     secondaryConnections.length,
     sendIntroductionRequest,
