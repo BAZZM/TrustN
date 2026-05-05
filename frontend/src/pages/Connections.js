@@ -306,7 +306,6 @@ export default function Connections() {
     pendingIntroTargetIds,
     pickedSecondary,
     user?.id,
-    focusedConnection?.rawId,
   ]);
 
   function respondToRequest(requestId, action) {
