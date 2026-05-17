@@ -54,7 +54,10 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const localDb = /@(localhost|127\.0\.0\.1)(:|\/)/i.test(url);
+  const client = new Client(
+    localDb ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: false } }
+  );
   await client.connect();
 
   const stripBom = (t) => (t.charCodeAt(0) === 0xfeff ? t.slice(1) : t);
