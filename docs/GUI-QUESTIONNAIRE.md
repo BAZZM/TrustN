@@ -1,6 +1,6 @@
 # GUI & experience – your input
 
-Use this to shape how the Trust Network looks and behaves on **website** and **phone**. Your answers will guide the next design and feature pass.
+Use this to shape how the Intro looks and behaves on **website** and **phone**. Your answers will guide the next design and feature pass.
 
 ---
 
@@ -28,7 +28,7 @@ Use this to shape how the Trust Network looks and behaves on **website** and **p
 
 ---
 
-## 4. Trust Network–specific
+## 4. Intro–specific
 
 - What are the **main actions** users do most? (e.g. view connections, add/remove trust, see activity, manage profile.) Which should be **one tap away** on phone?
 - How should **trust/connection strength** be shown? (e.g. numbers, levels, colors, simple on/off.)

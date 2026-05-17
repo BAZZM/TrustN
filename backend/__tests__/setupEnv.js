@@ -2,9 +2,9 @@
 // dedicated test database that globalSetup will have just created.
 const host = process.env.TEST_PG_HOST || '127.0.0.1';
 const port = process.env.TEST_PG_PORT || '5433';
-const user = process.env.TEST_PG_USER || 'trustnetwork';
+const user = process.env.TEST_PG_USER || 'intro';
 const password = process.env.TEST_PG_PASSWORD || 'changeme123';
-const dbName = process.env.TEST_DB_NAME || 'trustnetwork_test';
+const dbName = process.env.TEST_DB_NAME || 'intro_test';
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = `postgresql://${user}:${password}@${host}:${port}/${dbName}`;

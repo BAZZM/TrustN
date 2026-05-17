@@ -1,5 +1,5 @@
 {
-  "name": "trust-network-backend",
+  "name": "intro-backend",
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {

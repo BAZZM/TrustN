@@ -1,6 +1,6 @@
 # Web + Android (APK) – Questions for Implementation
 
-To make Trust Network both web-accessible and available as a downloadable Android APK, the following questions need your input:
+To make Intro both web-accessible and available as a downloadable Android APK, the following questions need your input:
 
 ---
 
@@ -24,7 +24,7 @@ To make Trust Network both web-accessible and available as a downloadable Androi
 
 ## 3. **API & Backend**
 
-- **Base URL**: For the APK, what will the API base URL be? (e.g. `https://api.trustnetwork.example.com`)
+- **Base URL**: For the APK, what will the API base URL be? (e.g. `https://api.intro.example.com`)
 - **Environment**: Separate staging/production backends, or one for both web and mobile?
 - **CORS**: Should we allow requests from `file://` or `capacitor://` origins for local/hybrid apps?
 

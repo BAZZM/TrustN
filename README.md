@@ -1,4 +1,4 @@
-# Trust Network (**TrustN**)
+# Intro (**Intro**)
 
 Deploy to production with **[Fly.io](https://fly.io/)** using **`backend/fly.toml`**, **`frontend/fly.toml`**, and the Dockerfiles referenced there. Full **handoff / upload–download workflow** (what lives on Fly vs Git, provision, deploy, inspect): **[`deploy/FLY.md`](deploy/FLY.md)**.
 
@@ -23,9 +23,9 @@ Deploy to production with **[Fly.io](https://fly.io/)** using **`backend/fly.tom
 4. Test login: +1234567890 / code: 123456
 
 ## Architecture
-- Frontend: trust-network-web (React, port 80)
-- Backend: trust-network-api (Node.js, host port **3000**)
-- Database: trust-network-db (PostgreSQL, host port **5433** → container 5432)
+- Frontend: intro-web (React, port 80)
+- Backend: intro-api (Node.js, host port **3000**)
+- Database: intro-db (PostgreSQL, host port **5433** → container 5432)
 
 ## Commands
 ```powershell
@@ -44,8 +44,8 @@ docker-compose ps
 # Rebuild
 docker-compose up -d --build
 
-# Database (default DB name: trustnetwork)
-docker exec -it trust-network-db psql -U trustnetwork -d trustnetwork
+# Database (default DB name: intro)
+docker exec -it intro-db psql -U intro -d intro
 ```
 
 ## Test Users

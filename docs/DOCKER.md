@@ -1,4 +1,4 @@
-# Docker - Trust Network
+# Docker - Intro
 
 ## Quick start
 
@@ -8,7 +8,7 @@ docker compose up -d
 
 - Frontend (web): http://localhost (port 80)
 - Backend API: http://localhost:3000 or via nginx frontend at `/api/`
-- Database: localhost:5433 (maps to 5432 in the container; user trustnetwork, db trustnetwork)
+- Database: localhost:5433 (maps to 5432 in the container; user intro, db intro)
 
 ## Clean rebuild (propagate code changes)
 

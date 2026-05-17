@@ -1,6 +1,6 @@
 # auto-apply-compose-fix.ps1
 # Backs up docker-compose.yml, merges duplicate environment blocks for the Postgres service,
-# ensures POSTGRES_DB is set to "trust-network-db", recreates the DB service, creates the DB,
+# ensures POSTGRES_DB is set to "intro-db", recreates the DB service, creates the DB,
 # attempts common migrations inside backend, and restarts backend.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -88,7 +88,7 @@ for ($i=0; $i -lt $serviceBlock.Length; $i++) {
 }
 
 # If only one or none, ensure POSTGRES_DB exists; otherwise merge duplicates
-$canonicalDb = "trust-network-db"
+$canonicalDb = "intro-db"
 if ($envBlocks.Count -le 1) {
     # ensure POSTGRES_DB present; if not, insert under environment or create environment block
     if ($envBlocks.Count -eq 1) {

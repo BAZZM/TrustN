@@ -1,6 +1,6 @@
-﻿{
-  "name": "Trust Network",
-  "short_name": "TrustNet",
+{
+  "name": "Intro",
+  "short_name": "Intro",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

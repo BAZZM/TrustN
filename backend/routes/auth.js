@@ -44,7 +44,7 @@ async function sendOtpViaTwilio(phone, code) {
   try {
     const twilio = require('twilio')(accountSid, authToken);
     await twilio.messages.create({
-      body: `Your Trust Network verification code is: ${code}`,
+      body: `Your Intro verification code is: ${code}`,
       from: fromNumber,
       to: phone,
     });

@@ -3,14 +3,14 @@
 # Run this script to create all necessary files
 # ============================================
 
-Write-Host "🚀 Trust Network - PowerShell Deployment Script" -ForegroundColor Cyan
+Write-Host "🚀 Intro - PowerShell Deployment Script" -ForegroundColor Cyan
 Write-Host "================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Verify we're in the trust-network directory
+# Verify we're in the intro directory
 if (-not (Test-Path "frontend") -or -not (Test-Path "backend") -or -not (Test-Path "database")) {
-    Write-Host "❌ Error: Please run this script from the trust-network directory" -ForegroundColor Red
-    Write-Host "   Expected structure: trust-network/frontend, trust-network/backend, trust-network/database" -ForegroundColor Yellow
+    Write-Host "❌ Error: Please run this script from the intro directory" -ForegroundColor Red
+    Write-Host "   Expected structure: intro/frontend, intro/backend, intro/database" -ForegroundColor Yellow
     exit 1
 }
 
@@ -32,8 +32,8 @@ Write-Host "Creating frontend files..." -ForegroundColor Yellow
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#1e40af">
-  <meta name="description" content="Trust Network - Connect through trusted recommendations">
-  <title>Trust Network</title>
+  <meta name="description" content="Intro - Connect through trusted recommendations">
+  <title>Intro</title>
   <link rel="icon" type="image/svg+xml" href="/shield.svg">
   <link rel="manifest" href="/manifest.json">
   <style>
@@ -96,7 +96,7 @@ Write-Host "Creating frontend files..." -ForegroundColor Yellow
       <path d="M50 10L20 30V70L50 90L80 70V30L50 10Z" stroke="#60a5fa" stroke-width="3" fill="#1e40af" opacity="0.8"/>
       <path d="M40 45L47 52L62 37" stroke="#f1f5f9" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    <div class="loading-text">Trust Network</div>
+    <div class="loading-text">Intro</div>
     <div class="loading-subtitle">Connecting trusted professionals...</div>
     <div class="loading-spinner"></div>
   </div>
@@ -121,8 +121,8 @@ Write-Host "  ✓ frontend/public/index.html" -ForegroundColor Green
 # Create frontend/public/manifest.json
 @'
 {
-  "name": "Trust Network",
-  "short_name": "TrustNet",
+  "name": "Intro",
+  "short_name": "Intro",
   "description": "Connect through trusted recommendations",
   "start_url": "/",
   "display": "standalone",
@@ -188,7 +188,7 @@ function App() {
           <path d="M40 45L47 52L62 37" stroke="#f1f5f9" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
         
-        <h1>Trust Network</h1>
+        <h1>Intro</h1>
         <p className="subtitle">Your trusted professional network</p>
         
         <div className="status-card">
@@ -418,7 +418,7 @@ Write-Host "  ✓ frontend/src/index.css" -ForegroundColor Green
 # Create frontend/package.json
 @'
 {
-  "name": "trust-network-frontend",
+  "name": "intro-frontend",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
@@ -526,9 +526,9 @@ Write-Host "Creating backend files..." -ForegroundColor Yellow
 # Create backend/package.json
 @'
 {
-  "name": "trust-network-backend",
+  "name": "intro-backend",
   "version": "1.0.0",
-  "description": "Trust Network Backend API",
+  "description": "Intro Backend API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -709,28 +709,28 @@ version: '3.8'
 services:
   database:
     image: postgres:15-alpine
-    container_name: trust-network-db
+    container_name: intro-db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: trustnetwork
+      POSTGRES_USER: intro
       POSTGRES_PASSWORD: changeme123
-      POSTGRES_DB: trust_network
+      POSTGRES_DB: intro
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U trustnetwork"]
+      test: ["CMD-SHELL", "pg_isready -U intro"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - trust-network
+      - intro
 
   backend:
     build: ./backend
-    container_name: trust-network-api
+    container_name: intro-api
     restart: unless-stopped
     depends_on:
       database:
@@ -738,7 +738,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://trustnetwork:changeme123@database:5432/trust_network
+      DATABASE_URL: postgresql://intro:changeme123@database:5432/intro
     ports:
       - "3000:3000"
     healthcheck:
@@ -747,11 +747,11 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - trust-network
+      - intro
 
   frontend:
     build: ./frontend
-    container_name: trust-network-web
+    container_name: intro-web
     restart: unless-stopped
     depends_on:
       backend:
@@ -764,14 +764,14 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - trust-network
+      - intro
 
 volumes:
   postgres_data:
     driver: local
 
 networks:
-  trust-network:
+  intro:
     driver: bridge
 "@
 $dockerComposeYml | Set-Content -Path "docker-compose.yml" -Encoding UTF8
@@ -786,7 +786,7 @@ Write-Host "  ✓ .env" -ForegroundColor Green
 
 # Create README.md
 @'
-# Trust Network - Docker Deployment
+# Intro - Docker Deployment
 
 ## Quick Start
 

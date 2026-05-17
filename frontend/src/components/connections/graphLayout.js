@@ -1,5 +1,5 @@
 /**
- * Platform-agnostic graph model for Trust Network connections.
+ * Platform-agnostic graph model for Intro connections.
  * Pure functions only (no React). Use from web SVG, React Native SVG, or tests.
  *
  * Product defaults (change only with stakeholder sign-off):

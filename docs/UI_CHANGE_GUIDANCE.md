@@ -1,8 +1,8 @@
 # UI change guidance — context, pitfalls, and agent workflow
 
-This document is the **working map** for anyone changing the Trust Network frontend (including automated agents). It ties together routing, trust-graph vs contacts UX, API coupling, i18n, CSP, and deployment surfaces. Use it **before** implementing UI changes so assumptions stay aligned with the repo.
+This document is the **working map** for anyone changing the Intro frontend (including automated agents). It ties together routing, trust-graph vs contacts UX, API coupling, i18n, CSP, and deployment surfaces. Use it **before** implementing UI changes so assumptions stay aligned with the repo.
 
-**Repo-wide agent checklist:** [`AGENTS.md`](../AGENTS.md), Cursor [**`.cursor/rules/trustn-agent-context.mdc`**](../.cursor/rules/trustn-agent-context.mdc) (`alwaysApply`).
+**Repo-wide agent checklist:** [`AGENTS.md`](../AGENTS.md), Cursor [**`.cursor/rules/intro-agent-context.mdc`**](../.cursor/rules/intro-agent-context.mdc) (`alwaysApply`).
 
 **Companion docs (prefer these when scopes overlap):**
 
@@ -101,7 +101,7 @@ Backend authorization is strict (403/401). UI should surface failures without le
 
 - **Local CRA:** `cd frontend && npm start` → port **3000**; API **5000** (avoid port clash with Compose backend on 3000 — see README).
 - **Compose:** full stack often **`http://localhost`** (nginx → frontend + proxied API per compose).
-- **Fly:** static web **`trustn-web`** built with **`REACT_APP_API_URL=https://trustn-api.fly.dev`** (see [`deploy/FLY.md`](../deploy/FLY.md)).
+- **Fly:** static web **`intro-web`** built with **`REACT_APP_API_URL=https://intro-api.fly.dev`** (see [`deploy/FLY.md`](../deploy/FLY.md)).
 
 ---
 

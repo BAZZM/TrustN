@@ -40,7 +40,7 @@ export default function Layout({ children }) {
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
           <Link to="/" className="layout-header__logo">
-            Trust Network
+            Intro
           </Link>
           <button type="button" className="layout-header__logout" onClick={() => setUser(null)} aria-label="Sign out">
             Sign out

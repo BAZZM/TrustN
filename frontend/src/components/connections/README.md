@@ -1,4 +1,4 @@
-# Trust Network connections (graph) module
+# Intro connections (graph) module
 
 ## Stable, platform-agnostic API — `graphLayout.js`
 

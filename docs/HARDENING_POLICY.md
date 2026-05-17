@@ -1,6 +1,6 @@
 # Security Hardening Policy
 
-This document defines hardening policies and a checklist for future improvements to the Trust Network application.
+This document defines hardening policies and a checklist for future improvements to the Intro application.
 
 ## 1. Authentication & Authorization
 

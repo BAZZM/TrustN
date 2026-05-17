@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Trust Network - Clean Docker rebuild
+# Intro - Clean Docker rebuild
 # Usage:
 #   ./scripts/docker-rebuild.sh         # Rebuild and start (keeps existing DB volume)
 #   ./scripts/docker-rebuild.sh --reset # Rebuild, remove volumes, then start (fresh DB)

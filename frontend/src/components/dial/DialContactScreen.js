@@ -215,7 +215,7 @@ export default function DialContactScreen({
 
       {!hasAny && (
         <p className="dial-contact-screen__empty">
-          {t("contacts.noContacts") || "No contacts yet. Import your contact list to find people on Trust Network."}
+          {t("contacts.noContacts") || "No contacts yet. Import your contact list to find people on Intro."}
         </p>
       )}
 

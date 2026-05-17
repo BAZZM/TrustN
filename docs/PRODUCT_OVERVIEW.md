@@ -1,12 +1,12 @@
-# Trust Network — product overview (current codebase)
+# Intro — product overview (current codebase)
 
 Copy-paste–ready description of what the application does today, plus an entity-relationship diagram of the persisted data model.
 
 ---
 
-## What Trust Network does (current codebase)
+## What Intro does (current codebase)
 
-**Trust Network** is a professional networking web application built with a **React 18 (Create React App)** frontend, **Node.js / Express** API, and **PostgreSQL**. It is typically run via **Docker Compose** (nginx-served frontend, API container, Postgres).
+**Intro** is a professional networking web application built with a **React 18 (Create React App)** frontend, **Node.js / Express** API, and **PostgreSQL**. It is typically run via **Docker Compose** (nginx-served frontend, API container, Postgres).
 
 ### Identity and access
 

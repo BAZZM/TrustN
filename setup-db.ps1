@@ -1,8 +1,8 @@
-Write-Host "Setting up Trust Network database..."
+Write-Host "Setting up Intro database..."
 
-$container = "trust-network-db"
-$dbUser    = "trustnetwork"
-$dbName    = "trust_network"
+$container = "intro-db"
+$dbUser    = "intro"
+$dbName    = "intro"
 
 Write-Host "Waiting for Postgres to be ready..."
 

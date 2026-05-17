@@ -30,7 +30,7 @@
 | Black background, unichrome, professional | Done | #000 background, monochrome accents |
 | Self-drawing (stroke-path) animation | Done | SVG circle `strokeDasharray` / `strokeDashoffset` on contact ring |
 
-## 4. Trust Network–specific
+## 4. Intro–specific
 
 | Item | Status | Notes |
 |------|--------|-------|

@@ -1,6 +1,6 @@
 # Compliance Rules and Setup Guide
 
-This document states which security and compliance rules are currently adhered to in the Trust Network application and what still needs to be set up (e.g. for production or full compliance).
+This document states which security and compliance rules are currently adhered to in the Intro application and what still needs to be set up (e.g. for production or full compliance).
 
 ---
 

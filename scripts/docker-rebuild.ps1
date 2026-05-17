@@ -1,4 +1,4 @@
-# Trust Network - Clean Docker rebuild
+# Intro - Clean Docker rebuild
 # Usage:
 #   .\scripts\docker-rebuild.ps1         # Rebuild and start (keeps existing DB volume)
 #   .\scripts\docker-rebuild.ps1 -Reset  # Rebuild, remove volumes, then start (fresh DB)

@@ -18,52 +18,52 @@ const AppContext = createContext(null);
 export function AppProvider({ children }) {
   const [user, setUserState] = useState(() => {
     try {
-      const s = localStorage.getItem("trust_network_user");
+      const s = localStorage.getItem("intro_user");
       return s ? JSON.parse(s) : null;
     } catch {
       return null;
     }
   });
-  const [token, setTokenState] = useState(() => localStorage.getItem("trust_network_token") || null);
+  const [token, setTokenState] = useState(() => localStorage.getItem("intro_token") || null);
   const [theme, setThemeState] = useState(() => {
     try {
-      const t = localStorage.getItem("trust_network_theme");
+      const t = localStorage.getItem("intro_theme");
       return t ? JSON.parse(t) : defaultTheme;
     } catch {
       return defaultTheme;
     }
   });
-  const [locale, setLocaleState] = useState(() => localStorage.getItem("trust_network_locale") || "en");
+  const [locale, setLocaleState] = useState(() => localStorage.getItem("intro_locale") || "en");
   const [themesList, setThemesList] = useState([]);
 
   const setUser = useCallback((u, authToken) => {
     setUserState(u);
     if (u) {
-      localStorage.setItem("trust_network_user", JSON.stringify(u));
+      localStorage.setItem("intro_user", JSON.stringify(u));
       if (authToken) {
         setTokenState(authToken);
-        localStorage.setItem("trust_network_token", authToken);
+        localStorage.setItem("intro_token", authToken);
       }
     } else {
-      localStorage.removeItem("trust_network_user");
-      localStorage.removeItem("trust_network_token");
+      localStorage.removeItem("intro_user");
+      localStorage.removeItem("intro_token");
       setTokenState(null);
     }
   }, []);
 
   useEffect(() => {
-    const t = localStorage.getItem("trust_network_token");
+    const t = localStorage.getItem("intro_token");
     if (t) setTokenState(t);
   }, []);
 
   const setTheme = useCallback((t) => {
     setThemeState(t || defaultTheme);
-    localStorage.setItem("trust_network_theme", JSON.stringify(t || defaultTheme));
+    localStorage.setItem("intro_theme", JSON.stringify(t || defaultTheme));
   }, []);
 
   const setLocale = useCallback((l) => {
     setLocaleState(l);
-    localStorage.setItem("trust_network_locale", l);
+    localStorage.setItem("intro_locale", l);
   }, []);
 
   useEffect(() => {
@@ -75,7 +75,7 @@ export function AppProvider({ children }) {
     const requestInterceptor = axios.interceptors.request.use(
       (config) => {
         // Always check localStorage for latest token (in case it was updated)
-        const currentToken = localStorage.getItem("trust_network_token");
+        const currentToken = localStorage.getItem("intro_token");
         if (currentToken) {
           config.headers = config.headers || {};
           config.headers.Authorization = `Bearer ${currentToken}`;

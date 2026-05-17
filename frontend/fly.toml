@@ -1,5 +1,5 @@
-# TrustN Web — Fly.io static + nginx (deploy from frontend/)
-app = "trustn-web"
+# Intro Web — Fly.io static + nginx (deploy from frontend/)
+app = "intro-web"
 primary_region = "iad"
 
 [build]

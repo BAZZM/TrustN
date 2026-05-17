@@ -15,7 +15,7 @@ This document details errors encountered and their fixes, plus security consider
 - Token might not be set before first API call
 
 **Fix**:
-- Updated `AppContext.js` axios interceptor to always check `localStorage.getItem("trust_network_token")` on every request
+- Updated `AppContext.js` axios interceptor to always check `localStorage.getItem("intro_token")` on every request
 - Ensured interceptor runs on mount and reads latest token value
 - Added proper header assignment: `config.headers = config.headers || {}; config.headers.Authorization = ...`
 

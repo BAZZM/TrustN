@@ -42,7 +42,7 @@ Compose **`default.conf`** and **`fly-static.conf`** both set **`X-XSS-Protectio
 ## Verification
 
 1. Open DevTools → **Network** → document (`/` or `/contacts`) → **Response Headers** → **`Content-Security-Policy`**.
-2. Repeat against **`https://trustn-web.fly.dev/`** (or your Fly hostname) after deploy.
+2. Repeat against **`https://intro-web.fly.dev/`** (or your Fly hostname) after deploy.
 3. Hit **`/api/health`** and inspect API response CSP if you rely on Helmet for HTML/error bodies.
 
 ---

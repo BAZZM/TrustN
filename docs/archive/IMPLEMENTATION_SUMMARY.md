@@ -14,7 +14,7 @@
 2. **Radial Contact Wheel Component**
    - **Two concentric rings**: Inner circle (smaller radius) and Secondary circle (larger radius)
    - **Drag-to-rotate**: Horizontal drag/swipe rotates the entire disk
-   - **Prospective connections**: Chips below the wheel showing contacts on Trust Network not yet in a circle
+   - **Prospective connections**: Chips below the wheel showing contacts on Intro not yet in a circle
    - **Search filtering**: Filters contacts by name or phone across all rings
    - **Hide/show toggles**: Toggle visibility of inner and secondary rings independently
    - **Node animations**: Spring-based entrance animations with stagger

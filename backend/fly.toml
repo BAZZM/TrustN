@@ -1,6 +1,6 @@
-# TrustN API — Fly.io (deploy from backend/)
+# Intro API — Fly.io (deploy from backend/)
 # Usage: cd backend && fly launch / fly deploy (see deploy/FLY.md)
-app = "trustn-api"
+app = "intro-api"
 primary_region = "iad"
 
 [build]

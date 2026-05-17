@@ -1,4 +1,4 @@
-# Trust Network – Testing Guide (Web & Phone)
+# Intro – Testing Guide (Web & Phone)
 
 Use this guide to verify the application after the security hardening release. The same web app is used on **desktop** and **phone** (mobile browser); there is no separate native phone app.
 

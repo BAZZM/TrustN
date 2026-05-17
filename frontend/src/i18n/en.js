@@ -1,6 +1,6 @@
 const en = {
   login: {
-    title: "Trust Network",
+    title: "Intro",
     subtitle: "Enter your phone to continue",
     phonePlaceholder: "Phone number",
     continue: "Continue",
@@ -96,9 +96,9 @@ const en = {
     subtitle: "Import contacts and add people to your secondary circle.",
     import: "Import contacts",
     importHint: "Paste one contact per line: phone, name (e.g. +1234567890, Jane)",
-    noContacts: "No contacts yet. Import your contact list to find people on Trust Network.",
-    matched: "On Trust Network",
-    notMatched: "Not on Trust Network",
+    noContacts: "No contacts yet. Import your contact list to find people on Intro.",
+    matched: "On Intro",
+    notMatched: "Not on Intro",
     addToSecondary: "Add to secondary circle",
     requestSent: "Request sent",
     viewGrid: "Grid",

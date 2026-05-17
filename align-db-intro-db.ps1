@@ -1,5 +1,5 @@
-# align-db-trust-network-db-fixed.ps1
-# Run from project root (C:\Users\BazzM\Documents\Project Trust Incentif\trust-network)
+# align-db-intro-db-fixed.ps1
+# Run from project root (C:\Users\BazzM\Documents\Project Trust Incentif\intro)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
@@ -7,7 +7,7 @@ $ProjectRoot = (Get-Location).Path
 $BackupDir = Join-Path $ProjectRoot "align-db-backups"
 New-Item -Path $BackupDir -ItemType Directory -Force | Out-Null
 
-$CanonicalDb = "trust-network-db"
+$CanonicalDb = "intro-db"
 $ComposeFile = Join-Path $ProjectRoot "docker-compose.yml"
 $EnvFile = Join-Path $ProjectRoot ".env"
 $BackendServiceName = "backend"

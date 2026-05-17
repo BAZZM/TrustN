@@ -1,4 +1,4 @@
-﻿-- Trust Network Complete Database Schema
+-- Intro Complete Database Schema
 -- Naming: snake_case for all database objects
 
 -- Users table

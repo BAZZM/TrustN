@@ -28,3 +28,4 @@ npm-debug.log*
 align-db-backups/
 compose-fix-backups/
 frontend_state_report.txt
+backend/database/

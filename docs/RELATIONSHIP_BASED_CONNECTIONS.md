@@ -232,7 +232,7 @@ The migration `008_relationship_based_secondary_connections.sql` adds:
 
 To apply:
 ```bash
-psql -d trust_network -f database/migrations/008_relationship_based_secondary_connections.sql
+psql -d intro -f database/migrations/008_relationship_based_secondary_connections.sql
 ```
 
 ### Testing

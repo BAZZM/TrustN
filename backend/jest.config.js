@@ -1,5 +1,5 @@
 /**
- * Jest config for the Trust Network backend.
+ * Jest config for the Intro backend.
  *
  * Tests run against a real PostgreSQL instance (the docker-compose `database`
  * service mapped to localhost:5433 by default). They create a dedicated test
@@ -8,9 +8,9 @@
  * Required env vars (with sensible defaults):
  *   TEST_PG_HOST     (default 127.0.0.1)
  *   TEST_PG_PORT     (default 5433)
- *   TEST_PG_USER     (default trustnetwork)
+ *   TEST_PG_USER     (default intro)
  *   TEST_PG_PASSWORD (default changeme123)
- *   TEST_DB_NAME     (default trustnetwork_test)
+ *   TEST_DB_NAME     (default intro_test)
  */
 module.exports = {
   testEnvironment: 'node',

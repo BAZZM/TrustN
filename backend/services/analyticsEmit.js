@@ -13,7 +13,7 @@ function hashRef(id, salt) {
  */
 function emitAnalyticsEvent(pool, { userId, eventType, payload = {} }) {
   const salt =
-    process.env.ANALYTICS_HASH_SALT || process.env.JWT_SECRET || 'trustn-analytics-salt';
+    process.env.ANALYTICS_HASH_SALT || process.env.JWT_SECRET || 'intro-analytics-salt';
   const safe = { ...payload };
   if (safe.target_user_id != null) {
     safe.target_ref = hashRef(safe.target_user_id, salt);

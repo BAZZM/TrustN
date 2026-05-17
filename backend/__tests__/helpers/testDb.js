@@ -4,9 +4,9 @@ const path = require('path');
 
 const HOST = process.env.TEST_PG_HOST || '127.0.0.1';
 const PORT = process.env.TEST_PG_PORT || '5433';
-const USER = process.env.TEST_PG_USER || 'trustnetwork';
+const USER = process.env.TEST_PG_USER || 'intro';
 const PASSWORD = process.env.TEST_PG_PASSWORD || 'changeme123';
-const DB_NAME = process.env.TEST_DB_NAME || 'trustnetwork_test';
+const DB_NAME = process.env.TEST_DB_NAME || 'intro_test';
 
 const ADMIN_URL = `postgresql://${USER}:${PASSWORD}@${HOST}:${PORT}/postgres`;
 const TEST_URL = `postgresql://${USER}:${PASSWORD}@${HOST}:${PORT}/${DB_NAME}`;
