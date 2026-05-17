@@ -29,10 +29,15 @@ export default function Contacts() {
   const [viewMode, setViewMode] = useState(isMobile ? VIEW_RADIAL : VIEW_GRID);
   const [importOpen, setImportOpen] = useState(false);
   const [, setRadialSelected] = useState(null); // used by DialContactScreen onSelectContact + sendSecondaryRequest
+  const [loadError, setLoadError] = useState(false);
+  const [importStatus, setImportStatus] = useState(null);
+  const [modalError, setModalError] = useState(null);
+  const [radialError, setRadialError] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
     setLoading(true);
+    setLoadError(false);
     Promise.all([
       axios.get(baseURL + "/api/contacts"),
       axios.get(baseURL + "/api/connections"),
@@ -41,10 +46,10 @@ export default function Contacts() {
         setContacts(contactsRes.data.contacts || []);
         setConnections(connectionsRes.data.connections || []);
       })
-      .catch((err) => {
-        console.error('Contacts fetch error:', err.response?.status, err.response?.data);
+      .catch(() => {
         setContacts([]);
         setConnections([]);
+        setLoadError(true);
       })
       .finally(() => setLoading(false));
   }, [user, baseURL]);
@@ -92,11 +97,16 @@ export default function Contacts() {
     axios
       .get(`${baseURL}/api/connections/secondary-search?${params.toString()}`)
       .then((res) => {
-        if (!cancelled) setHybridSecondaryResults(res.data.results || []);
+        if (!cancelled) {
+          setHybridSecondaryResults(res.data.results || []);
+          setRadialError(false);
+        }
       })
-      .catch((err) => {
-        console.error("Contacts radial secondary-search error:", err.response?.status, err.response?.data);
-        if (!cancelled) setHybridSecondaryResults([]);
+      .catch(() => {
+        if (!cancelled) {
+          setHybridSecondaryResults([]);
+          setRadialError(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingHybridSecondaries(false);
@@ -116,31 +126,48 @@ export default function Contacts() {
         return { phone: parts[0] || "", name: parts[1] || "" };
       })
       .filter((c) => c.phone);
-    if (lines.length === 0) return;
+    if (lines.length === 0) {
+      setImportStatus({ type: "error", key: "contacts.importNoRows" });
+      return;
+    }
     setImporting(true);
+    setImportStatus(null);
     axios
       .post(baseURL + "/api/contacts/import", { contacts: lines })
       .then(() => {
         setImportText("");
         return axios.get(baseURL + "/api/contacts");
       })
-      .then((r) => setContacts(r.data.contacts || []))
-      .catch(() => {})
+      .then((r) => {
+        setContacts(r.data.contacts || []);
+        setImportStatus({ type: "success", key: "contacts.importSuccess" });
+      })
+      .catch((err) => {
+        setImportStatus({
+          type: "error",
+          message: err.response?.data?.error || t("contacts.importError"),
+        });
+      })
       .finally(() => setImporting(false));
   }
 
   function openAddToSecondary(contact) {
     if (!contact.user_id) return;
     setAddingFor(contact);
+    setModalError(null);
     axios
       .get(baseURL + "/api/contacts/possible-intermediaries", { params: { target_user_id: contact.user_id } })
       .then((r) => setIntermediaries(r.data.intermediaries || []))
-      .catch(() => setIntermediaries([]));
+      .catch(() => {
+        setIntermediaries([]);
+        setModalError(t("contacts.intermediariesError"));
+      });
   }
 
   function sendSecondaryRequest(intermediaryId) {
     if (!addingFor?.user_id || !user?.id) return;
     setSendingRequest(true);
+    setModalError(null);
     axios
       .post(baseURL + "/api/connection-requests", {
         target_user_id: addingFor.user_id,
@@ -157,7 +184,9 @@ export default function Contacts() {
         setContacts(cr.data.contacts || []);
         setConnections(connr.data.connections || []);
       })
-      .catch(() => {})
+      .catch((err) => {
+        setModalError(err.response?.data?.error || t("contacts.requestError"));
+      })
       .finally(() => setSendingRequest(false));
   }
 
@@ -211,6 +240,14 @@ export default function Contacts() {
             >
               {importing ? "Importing…" : t("contacts.import")}
             </motion.button>
+            {importStatus && (
+              <p
+                className={`contacts__status contacts__status--${importStatus.type}`}
+                role={importStatus.type === "error" ? "alert" : "status"}
+              >
+                {importStatus.message || t(importStatus.key)}
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -280,6 +317,11 @@ export default function Contacts() {
               theme={theme}
               t={t}
             />
+            {radialError && (
+              <p className="contacts__status contacts__status--error" role="alert">
+                {t("contacts.radialError")}
+              </p>
+            )}
           </div>
         )}
 
@@ -287,10 +329,24 @@ export default function Contacts() {
           <>
             <h2 className="contacts__section-title">{t("contacts.yourContacts")}</h2>
             {loading && <p className="contacts__loading">Loading…</p>}
-            {!loading && contacts.length === 0 && (
-              <p className="contacts__empty">{t("contacts.noContacts")}</p>
+            {!loading && loadError && (
+              <div className="contacts__empty contacts__empty--error" role="alert">
+                <p>{t("contacts.loadError")}</p>
+              </div>
             )}
-            {!loading && contacts.length > 0 && (
+            {!loading && !loadError && contacts.length === 0 && (
+              <div className="contacts__empty">
+                <p>{t("contacts.noContacts")}</p>
+                <button
+                  type="button"
+                  className="contacts__btn contacts__btn--secondary contacts__empty-action"
+                  onClick={() => setImportOpen(true)}
+                >
+                  {t("contacts.import")}
+                </button>
+              </div>
+            )}
+            {!loading && !loadError && contacts.length > 0 && (
               <motion.ul
                 className={`contacts__list ${viewMode === VIEW_GRID ? "contacts__list--grid" : "contacts__list--list"}`}
                 variants={container}
@@ -343,6 +399,7 @@ export default function Contacts() {
           onClick={() => {
             setAddingFor(null);
             setIntermediaries([]);
+            setModalError(null);
           }}
         >
           <motion.div
@@ -355,6 +412,11 @@ export default function Contacts() {
             <p className="contacts__modal-hint">
               Choose who will vouch for you (your inner-circle contact who knows them):
             </p>
+            {modalError && (
+              <p className="contacts__status contacts__status--error" role="alert">
+                {modalError}
+              </p>
+            )}
             {intermediaries.length === 0 && (
               <p className="contacts__empty">No eligible intermediary found.</p>
             )}
@@ -378,6 +440,7 @@ export default function Contacts() {
               onClick={() => {
                 setAddingFor(null);
                 setIntermediaries([]);
+                setModalError(null);
               }}
             >
               {t("common.cancel")}

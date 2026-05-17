@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { useApp } from "../context/AppContext";
@@ -14,7 +14,7 @@ export default function Admin() {
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(null);
 
-  useEffect(() => {
+  const loadAdminData = useCallback(() => {
     if (!user?.id || !token) return;
     setLoading(true);
     setError(null);
@@ -32,7 +32,11 @@ export default function Admin() {
         setHealth(null);
       })
       .finally(() => setLoading(false));
-  }, [user, baseURL, token]);
+  }, [baseURL, token, user?.id]);
+
+  useEffect(() => {
+    loadAdminData();
+  }, [loadAdminData]);
 
   function handleToggle(item) {
     if (!user?.id || !token) return;
@@ -74,7 +78,13 @@ export default function Admin() {
 
       {error && (
         <div className="admin__error" role="alert">
-          {error}
+          <div>
+            <strong>{error}</strong>
+            <p>{t("admin.errorHint")}</p>
+          </div>
+          <button type="button" className="admin__retry" onClick={loadAdminData}>
+            {t("admin.retry")}
+          </button>
         </div>
       )}
 
@@ -113,7 +123,10 @@ export default function Admin() {
       )}
 
       {!loading && config.length === 0 && !error && (
-        <p className="admin__empty">No config items.</p>
+        <section className="admin__section admin__empty">
+          <h2 className="admin__section-title">{t("admin.noConfigTitle")}</h2>
+          <p>{t("admin.noConfigBody")}</p>
+        </section>
       )}
 
       {!loading && config.length > 0 && !error && (
