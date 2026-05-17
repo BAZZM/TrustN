@@ -31,6 +31,12 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 
+  /* Immersive hero glass (Connections trust graph + floating dock); dock vars overridden on `.app--immersive-graph` */
+  --immersive-chrome-bg: rgba(8, 10, 14, 0.4);
+  --immersive-chrome-border: rgba(255, 255, 255, 0.14);
+  --immersive-chrome-blur: 8px;
+  --immersive-chrome-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+
   /* Floating dock / immersive graph – override per theme when available */
   --dock-surface: rgba(15, 15, 15, 0.72);
   --dock-border: rgba(255, 255, 255, 0.09);
@@ -38,7 +44,7 @@
   --dock-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   --hud-surface: rgba(10, 12, 18, 0.62);
   --hud-border: rgba(255, 255, 255, 0.08);
-  --sheet-surface: rgba(14, 16, 24, 0.92);
+  --sheet-surface: rgba(12, 14, 22, 0.82);
   --floating-nav-clearance: calc(76px + var(--safe-bottom));
 }
 

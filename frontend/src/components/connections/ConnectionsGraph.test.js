@@ -23,6 +23,8 @@ const translations = {
   "connections.noSecondary": "No secondary",
   "connections.moreConnections": "More",
   "connections.networkSummary": "Summary",
+  "connections.heroLineOverview": "Overview hero",
+  "connections.heroLineFocus": "Focus hero",
 };
 
 function t(key) {
@@ -81,6 +83,10 @@ describe("ConnectionsGraph", () => {
     expect(sheet).toBeTruthy();
     expect(sheet.classList.contains("connections__sheet--overlay")).toBe(true);
     expect(sheet.parentElement).toBe(shell);
+
+    const heroWrap = stage.querySelector(".connections__immersive-hero-wrap");
+    expect(heroWrap).toBeTruthy();
+    expect(stage.contains(heroWrap)).toBe(true);
   });
 
   it("paints secondary labels above the inner ring when a branch is focused", () => {

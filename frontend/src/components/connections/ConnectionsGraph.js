@@ -139,11 +139,14 @@ export default function ConnectionsGraph({
   t,
   immersive = false,
   statsSummary = null,
+  immersiveStatsKey = null,
   requestsSlot = null,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const [narrowViewport, setNarrowViewport] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [heroStatGlitch, setHeroStatGlitch] = useState(false);
+  const prevImmersiveStatsKeyRef = useRef(null);
 
   const pinchDisabled = !immersive || prefersReducedMotion;
   const { viewportRef, transformStyle, consumeShouldIgnoreTap, resetTransform, scale } = usePinchPanZoom({
@@ -157,6 +160,16 @@ export default function ConnectionsGraph({
     media.addEventListener("change", apply);
     return () => media.removeEventListener("change", apply);
   }, []);
+
+  useEffect(() => {
+    if (!immersive || immersiveStatsKey == null) return undefined;
+    const changed = prevImmersiveStatsKeyRef.current !== immersiveStatsKey;
+    prevImmersiveStatsKeyRef.current = immersiveStatsKey;
+    if (!changed) return undefined;
+    setHeroStatGlitch(true);
+    const id = window.setTimeout(() => setHeroStatGlitch(false), 680);
+    return () => window.clearTimeout(id);
+  }, [immersive, immersiveStatsKey]);
 
   const nodeMotionTransition = prefersReducedMotion
     ? { duration: 0.12, ease: "linear" }
@@ -431,10 +444,14 @@ export default function ConnectionsGraph({
     ) : null;
 
   if (immersive) {
+    const heroContextLine = focusUserId ? t("connections.heroLineFocus") : t("connections.heroLineOverview");
+    const statsWrapClass =
+      "connections__immersive-hero-stats" +
+      (heroStatGlitch ? " connections__immersive-hero-stats--glitch" : "");
+
     return (
       <section className="connections__graph-shell connections__graph-shell--immersive">
         <div
-          ref={viewportRef}
           className="connections__graph-stage connections__graph-stage--immersive"
           role="presentation"
           onClick={(e) => {
@@ -443,33 +460,34 @@ export default function ConnectionsGraph({
             onResetFocus();
           }}
         >
-          <div className="connections__pinch-inner" style={transformStyle}>
+          <div className="connections__immersive-hero-wrap">
+            <div
+              className="connections__immersive-hero-capsule"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="connections__immersive-hero-head">
+                <p className="connections__immersive-hero-line">{heroContextLine}</p>
+                {!pinchDisabled && scale > 1.06 && (
+                  <button
+                    type="button"
+                    className="connections__zoom-reset connections__zoom-reset--hero"
+                    onClick={() => resetTransform()}
+                  >
+                    {t("connections.resetZoom")}
+                  </button>
+                )}
+              </div>
+              {statsSummary ? (
+                <div className={statsWrapClass} aria-label={t("connections.networkSummary")}>
+                  {statsSummary}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div ref={viewportRef} className="connections__pinch-inner" style={transformStyle}>
             <div className="connections__svg-fit">{graphSvg}</div>
           </div>
-        </div>
-
-        <div className="connections__immersive-hud">
-          <div className="connections__immersive-hud-top">
-            <div className="connections__immersive-hud-copy">
-              <p className="connections__eyebrow">{t("connections.graphEyebrow")}</p>
-              <h2 className="connections__graph-title connections__graph-title--immersive">
-                {t("connections.graphTitle")}
-              </h2>
-              <p className="connections__graph-summary connections__graph-summary--immersive">
-                {focusUserId ? t("connections.focusActive") : t("connections.graphIntro")}
-              </p>
-            </div>
-            {!pinchDisabled && scale > 1.06 && (
-              <button type="button" className="connections__zoom-reset" onClick={() => resetTransform()}>
-                {t("connections.resetZoom")}
-              </button>
-            )}
-          </div>
-          {statsSummary ? (
-            <div className="connections__immersive-stats" aria-label={t("connections.networkSummary")}>
-              {statsSummary}
-            </div>
-          ) : null}
         </div>
 
         <div

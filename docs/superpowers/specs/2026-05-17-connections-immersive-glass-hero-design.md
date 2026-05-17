@@ -130,4 +130,6 @@
 
 Requirements sourced from user selections: **1D + condensed bar**, **2C**, **3A**, **4C**, **5C**, **6 (change + larger + idle)**, **7 (no PRM suppression for this hero)**, **8A**.
 
-**Next step:** User review of this file → `writing-plans` implementation plan (no code until plan is executed).
+**Status:** Approved — implemented 2026-05-17 (see plan `docs/superpowers/plans/2026-05-17-connections-immersive-glass-hero.md`).
+
+**Next step:** Maintenance only; optional Settings “calm mode” from §7.

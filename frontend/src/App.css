@@ -25,12 +25,16 @@
 
 .app--immersive-graph {
   min-height: 100dvh;
+  --dock-surface: var(--immersive-chrome-bg);
+  --dock-border: var(--immersive-chrome-border);
+  --dock-blur: var(--immersive-chrome-blur);
+  --dock-shadow: var(--immersive-chrome-shadow);
 }
 
 .app__main--immersive-graph {
   padding: 0;
   padding-bottom: 0;
-  overflow: hidden;
+  overflow: visible;
   max-width: none;
   margin-left: 0;
   margin-right: 0;

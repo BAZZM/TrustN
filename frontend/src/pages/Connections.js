@@ -368,6 +368,17 @@ export default function Connections() {
     ];
   }, [innerConnections.length, requestInbox.length, requestSent.length, t, visibleInnerConnections.length]);
 
+  const immersiveStatsKey = useMemo(
+    () =>
+      `${innerConnections.length}|${visibleInnerConnections.length}|${requestInbox.length}|${requestSent.length}`,
+    [
+      innerConnections.length,
+      visibleInnerConnections.length,
+      requestInbox.length,
+      requestSent.length,
+    ]
+  );
+
   const isSecondaryLoading = Boolean(focusUserId && secondaryUnifiedLoading);
   const showTrustGraph = !loading && innerConnections.length > 0;
   const immersiveGraph = showTrustGraph && narrowViewport;
@@ -569,6 +580,7 @@ export default function Connections() {
             <ConnectionsGraph
               immersive
               {...graphSharedProps}
+              immersiveStatsKey={immersiveStatsKey}
               statsSummary={statsChips}
               requestsSlot={
                 <ConnectionRequestsPanel

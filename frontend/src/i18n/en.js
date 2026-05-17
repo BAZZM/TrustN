@@ -27,6 +27,9 @@ const en = {
       "Tap an inner-circle connection to expand their branch. Tap someone in the outer ring to ask for an introduction through that person.",
     focusActive:
       "Focused branch view. Tap the background or reset to return to the wider network.",
+    /** Short single line for immersive glass hero (replaces long title stack on mobile). */
+    heroLineOverview: "Trust graph · tap inner for a branch, outer ring for intros.",
+    heroLineFocus: "Branch open · tap empty space or Reset.",
     defaultFocusTitle: "Graph-first by default",
     defaultFocusBody:
       "The first screen shows the strongest inner-circle connections around you so the network stays readable on mobile and scales as the graph grows.",
