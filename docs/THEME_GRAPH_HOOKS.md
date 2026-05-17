@@ -34,7 +34,7 @@ Future (add when implemented):
 |------|------|----------|
 | `ring` | Default; no focus | Current evenly spaced inner ring |
 | `ring_focus` | Legacy focus behavior | Full ring + fade non-focused (pre-helix) |
-| `helix_focus` | Immersive + `focusUserId` *(planned)* | Focused on main inner radius; others on spiral |
+| `helix_focus` | Immersive + `focusUserId` *(implemented 2026-05-18)* | Focused on main inner radius; others on Archimedean coil. Constants: `HELIX_R_MIN`, `HELIX_DELTA_R`, `HELIX_ANGLE_STEP_DEG`. |
 
 **Extension pattern:** `getInnerRingLayout(nodes, focusUserId, options)` where `options.layoutMode` is `'ring' | 'helix_focus'` (names subject to implementation). Default preserves today’s behavior for non-immersive routes.
 
@@ -69,3 +69,4 @@ Server delivers with theme payload; frontend maps to `options` for `getInnerRing
 | Date | Change |
 |------|--------|
 | 2026-05-18 | Initial document; helix_focus mode specified in design spec `2026-05-18-connections-immersive-helix-focus-design.md` |
+| 2026-05-18 | `helix_focus` implemented in `graphLayout.js` with constants `HELIX_R_MIN=56`, `HELIX_DELTA_R=10`, `HELIX_ANGLE_STEP_DEG=52`; peek sheet + FAB landed in `ConnectionsGraph.js` / `Connections.css`. |
