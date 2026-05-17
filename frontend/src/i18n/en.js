@@ -51,6 +51,8 @@ const en = {
     you: "You",
     sheetPullHint: "Details & requests",
     resetZoom: "Reset zoom",
+    heroFabAria: "Open details and requests",
+    expandDetails: "Details",
     introQueue: "Introductions",
     pickSecondaryHint: "Tap an outer-ring node or the + chip, then use Request intro.",
     discoveryBody: "{intermediary} will be asked to introduce you to {target}.",

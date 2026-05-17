@@ -25,6 +25,8 @@ const translations = {
   "connections.networkSummary": "Summary",
   "connections.heroLineOverview": "Overview hero",
   "connections.heroLineFocus": "Focus hero",
+  "connections.heroFabAria": "Open details and requests",
+  "connections.expandDetails": "Details",
 };
 
 function t(key) {
@@ -131,5 +133,40 @@ describe("ConnectionsGraph", () => {
 
     expect(firstFloatingLabelIndex).toBeGreaterThan(lastInnerIndex);
     expect(floatingLabels[0].textContent).toBe("Paul Parker");
+  });
+
+  it("renders the immersive sheet in peek state by default and reveals the FAB", () => {
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <ConnectionsGraph
+          currentUserName="Alice"
+          innerConnections={[
+            { id: "1", name: "Diana Davis", strength: 5 },
+            { id: "2", name: "Bob Brown", strength: 4 },
+          ]}
+          overflowInnerConnections={[]}
+          focusUserId="1"
+          focusedConnection={{ id: "1", name: "Diana Davis", jobRole: "Data Scientist", industry: "Technology" }}
+          secondaryConnections={[]}
+          secondaryLoading={false}
+          onFocusConnection={jest.fn()}
+          onResetFocus={jest.fn()}
+          onSelectSecondary={jest.fn()}
+          t={t}
+          immersive
+        />
+      );
+    });
+
+    const sheet = container.querySelector(".connections__sheet");
+    expect(sheet).toBeTruthy();
+    expect(sheet.classList.contains("connections__sheet--peek")).toBe(true);
+    expect(sheet.classList.contains("connections__sheet--open")).toBe(false);
+
+    const fab = container.querySelector(".connections__fab");
+    expect(fab).toBeTruthy();
+    expect(fab.getAttribute("aria-label")).toBe("Open details and requests");
   });
 });

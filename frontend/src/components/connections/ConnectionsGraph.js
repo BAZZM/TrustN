@@ -180,9 +180,14 @@ export default function ConnectionsGraph({
 
   const innerHitPadding = narrowViewport ? NODE_HIT_PADDING : 10;
 
+  const innerLayoutOptions = useMemo(
+    () =>
+      immersive && focusUserId ? { layoutMode: "helix_focus" } : undefined,
+    [immersive, focusUserId]
+  );
   const innerLayout = useMemo(
-    () => getInnerRingLayout(innerConnections, focusUserId),
-    [innerConnections, focusUserId]
+    () => getInnerRingLayout(innerConnections, focusUserId, innerLayoutOptions),
+    [innerConnections, focusUserId, innerLayoutOptions]
   );
   const focusPresentationAngle = useMemo(
     () => (focusUserId ? pickFocusPresentationAngle(innerConnections, focusUserId) : null),
@@ -490,11 +495,21 @@ export default function ConnectionsGraph({
           </div>
         </div>
 
+        {focusUserId && !sheetOpen && (
+          <button
+            type="button"
+            className="connections__fab"
+            aria-label={t("connections.heroFabAria")}
+            onClick={() => setSheetOpen(true)}
+          >
+            {t("connections.expandDetails")}
+          </button>
+        )}
         <div
           className={
             "connections__sheet" +
             " connections__sheet--overlay" +
-            (sheetOpen ? " connections__sheet--open" : "")
+            (sheetOpen ? " connections__sheet--open" : " connections__sheet--peek")
           }
         >
           <div className="connections__sheet-static">{focusCard}</div>
