@@ -9,6 +9,7 @@ import {
   getInnerRingLayout,
   getNodeInitials,
   getSecondaryRingLayout,
+  pickFocusPresentationAngle,
   truncateLabel,
 } from "./graphLayout";
 
@@ -36,6 +37,7 @@ function Node({
   motionTransition,
   hitPadding = 10,
   tapSlop = 0,
+  hideLabel = false,
 }) {
   const rootClass = [className, selected ? `${className}--selected` : ""].filter(Boolean).join(" ");
   const downRef = useRef(null);
@@ -108,9 +110,11 @@ function Node({
       <text textAnchor="middle" dominantBaseline="central" className={`${className}__glyph`}>
         {getNodeInitials(node.name)}
       </text>
-      <text y={node.radius + 24} textAnchor="middle" className={labelClassName}>
-        {truncateLabel(label, 14)}
-      </text>
+      {!hideLabel && (
+        <text y={node.radius + 24} textAnchor="middle" className={labelClassName}>
+          {truncateLabel(label, 14)}
+        </text>
+      )}
     </motion.g>
   );
 }
@@ -167,10 +171,14 @@ export default function ConnectionsGraph({
     () => getInnerRingLayout(innerConnections, focusUserId),
     [innerConnections, focusUserId]
   );
+  const focusPresentationAngle = useMemo(
+    () => (focusUserId ? pickFocusPresentationAngle(innerConnections, focusUserId) : null),
+    [innerConnections, focusUserId]
+  );
   const visibleSecondary = secondaryConnections.slice(0, MAX_VISIBLE_SECONDARY);
   const secondaryLayout = useMemo(
-    () => getSecondaryRingLayout(visibleSecondary),
-    [visibleSecondary]
+    () => getSecondaryRingLayout(visibleSecondary, focusPresentationAngle),
+    [visibleSecondary, focusPresentationAngle]
   );
   const hiddenSecondaryCount = Math.max(0, secondaryConnections.length - visibleSecondary.length);
   const focusedLayoutNode = innerLayout.find((item) => item.isFocused) || null;
@@ -273,6 +281,7 @@ export default function ConnectionsGraph({
             motionTransition={nodeMotionTransition}
             hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
             tapSlop={immersive ? tapSlop : 0}
+            hideLabel
           />
         </g>
       ))}
@@ -331,6 +340,19 @@ export default function ConnectionsGraph({
           hitPadding={innerHitPadding}
           tapSlop={tapSlop}
         />
+      ))}
+
+      {secondaryLayout.map((node) => (
+        <text
+          key={`secondary-label-${node.id}`}
+          x={node.x}
+          y={node.y + node.radius + 24}
+          textAnchor="middle"
+          className="connections__secondary-label connections__secondary-label--floating"
+          data-testid="secondary-floating-label"
+        >
+          {truncateLabel(node.name, 14)}
+        </text>
       ))}
 
       {focusUserId && hiddenSecondaryCount > 0 && (
