@@ -13,6 +13,8 @@ export const GRAPH_VIEWBOX = 420;
 export const GRAPH_CENTER = GRAPH_VIEWBOX / 2;
 export const INNER_RING_RADIUS = 118;
 export const SECONDARY_RING_RADIUS = 174;
+export const SECONDARY_RING_RADIUS_FOCUSED = 210;
+export const FOCUS_FAN_DEGREES = 110;
 export const MAX_VISIBLE_INNER = 8;
 export const MAX_VISIBLE_SECONDARY = 8;
 /** Extra radius beyond node core for touch / accessibility hit target (user units, matches SVG viewBox scale). */
@@ -93,6 +95,53 @@ export function polarToCartesian(centerX, centerY, radius, angleDeg) {
   };
 }
 
+const FOCUS_PRESENTATION_CANDIDATES = [-90, -60, -120, -45, -135, 0, 180];
+
+function normalizeAngle(angle) {
+  return ((angle % 360) + 360) % 360;
+}
+
+function angularDistance(a, b) {
+  const diff = ((normalizeAngle(a) - normalizeAngle(b) + 540) % 360) - 180;
+  return Math.abs(diff);
+}
+
+export function pickFocusPresentationAngle(nodes, focusUserId) {
+  if (!focusUserId || !Array.isArray(nodes) || nodes.length <= 1) {
+    return -90;
+  }
+
+  const total = nodes.length;
+  const baseStep = 360 / total;
+  const baseAngles = nodes.map((_, index) => -90 + index * baseStep);
+  const focusIndex = nodes.findIndex((node) => node.id === focusUserId);
+
+  if (focusIndex < 0) return -90;
+
+  const otherAngles = baseAngles.filter((_, index) => index !== focusIndex);
+
+  let best = { angle: -90, score: -Infinity, upper: false };
+
+  FOCUS_PRESENTATION_CANDIDATES.forEach((candidate) => {
+    const rotation = candidate - baseAngles[focusIndex];
+    const rotatedOthers = otherAngles.map((angle) => angle + rotation);
+    const minDistance = rotatedOthers.reduce(
+      (acc, angle) => Math.min(acc, angularDistance(angle, candidate)),
+      Infinity
+    );
+    const upper = Math.sin((candidate * Math.PI) / 180) < 0;
+    const isBetterScore = minDistance > best.score + 1e-6;
+    const isTieAndUpper =
+      Math.abs(minDistance - best.score) <= 1e-6 && upper && !best.upper;
+
+    if (isBetterScore || isTieAndUpper) {
+      best = { angle: candidate, score: minDistance, upper };
+    }
+  });
+
+  return best.angle;
+}
+
 export function getInnerRingLayout(nodes, focusUserId) {
   const total = nodes.length;
 
@@ -103,7 +152,9 @@ export function getInnerRingLayout(nodes, focusUserId) {
   const baseStep = 360 / total;
   const baseAngles = nodes.map((_, index) => -90 + index * baseStep);
   const focusIndex = focusUserId ? nodes.findIndex((node) => node.id === focusUserId) : -1;
-  const rotation = focusIndex >= 0 ? -90 - baseAngles[focusIndex] : 0;
+  const presentationAngle =
+    focusIndex >= 0 ? pickFocusPresentationAngle(nodes, focusUserId) : -90;
+  const rotation = focusIndex >= 0 ? presentationAngle - baseAngles[focusIndex] : 0;
 
   return nodes.map((node, index) => {
     const angle = baseAngles[index] + rotation;
@@ -128,20 +179,38 @@ export function getInnerRingLayout(nodes, focusUserId) {
   });
 }
 
-export function getSecondaryRingLayout(nodes) {
+export function getSecondaryRingLayout(nodes, focusAngle = null) {
   const total = nodes.length;
 
   if (total === 0) {
     return [];
   }
 
-  const startAngle = -160;
-  const endAngle = -20;
+  const useFocusFan = typeof focusAngle === "number" && Number.isFinite(focusAngle);
+  const radius = useFocusFan ? SECONDARY_RING_RADIUS_FOCUSED : SECONDARY_RING_RADIUS;
+
+  let startAngle;
+  let endAngle;
+
+  if (useFocusFan) {
+    startAngle = focusAngle - FOCUS_FAN_DEGREES / 2;
+    endAngle = focusAngle + FOCUS_FAN_DEGREES / 2;
+  } else {
+    startAngle = -160;
+    endAngle = -20;
+  }
+
   const step = total === 1 ? 0 : (endAngle - startAngle) / (total - 1);
 
   return nodes.map((node, index) => {
-    const angle = total === 1 ? -90 : startAngle + step * index;
-    const point = polarToCartesian(GRAPH_CENTER, GRAPH_CENTER, SECONDARY_RING_RADIUS, angle);
+    let angle;
+    if (total === 1) {
+      angle = useFocusFan ? focusAngle : -90;
+    } else {
+      angle = startAngle + step * index;
+    }
+
+    const point = polarToCartesian(GRAPH_CENTER, GRAPH_CENTER, radius, angle);
     const nodeStrength = Math.max(0, Number(node.strength) || 0);
 
     return {
