@@ -6,6 +6,7 @@
  * - MAX_VISIBLE_INNER: top N inner-circle nodes on the first ring, sorted by strength/recency.
  * - Unfocused inners: faded (not removed) in focus mode.
  * - Node identity: peer_id via normalizeGraphNode.
+ * - SVG paint order & hit-testing: secondary branch bodies and quick-add chips are drawn before inner-ring nodes so faded inners stay clickable where geometry overlaps; “+N more” chip is painted above but uses pointer-events:none (ConnectionsGraph + Connections.css). Stage-level “reset focus” ignores taps that originate on interactive nodes (see ConnectionsGraph.js).
  * - On mobile, pair this module with a native/ WebView shell; this file stays unchanged.
  */
 export const GRAPH_VIEWBOX = 420;

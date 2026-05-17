@@ -1,3 +1,5 @@
+> **Archived.** Superseded by dial UI + [`../UI_CHANGE_GUIDANCE.md`](../UI_CHANGE_GUIDANCE.md).
+
 # Implementation Summary – Radial Contact UI
 
 ## What Was Implemented

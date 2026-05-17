@@ -16,6 +16,102 @@
   font-size: 0.95rem;
 }
 
+.dashboard__freshness {
+  margin: var(--space-sm) 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  opacity: 0.9;
+}
+
+.dashboard__loading {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.dashboard__banner {
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  font-size: 0.9rem;
+}
+
+.dashboard__banner--error {
+  background: rgba(212, 122, 122, 0.12);
+  border: 1px solid rgba(212, 122, 122, 0.35);
+  color: var(--color-error);
+}
+
+.dashboard__actions {
+  margin-bottom: var(--space-xl);
+}
+
+.dashboard__actions-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+.dashboard__actions-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.dashboard__action-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 500;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.dashboard__action-link:hover {
+  border-color: var(--color-accent, #5c6ac4);
+}
+
+.dashboard__action-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 1.5rem;
+  text-align: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(124, 176, 131, 0.25);
+  color: var(--color-success);
+}
+
+.dashboard-card__metric {
+  margin-top: var(--space-xs);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.dashboard-card__delta {
+  margin-top: var(--space-xs);
+  font-size: 0.85rem;
+  color: var(--color-text);
+}
+
+.dashboard-card__hint {
+  margin-top: var(--space-sm);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
 .dashboard__cards {
   list-style: none;
   margin: 0;

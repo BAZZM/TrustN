@@ -31,6 +31,10 @@ services:
       - ./database/migrations/012_rls_fixups_and_helpers.sql:/docker-entrypoint-initdb.d/13_rls_fixups_and_helpers.sql:ro
       - ./database/migrations/013_introduced_inner_connections.sql:/docker-entrypoint-initdb.d/14_introduced_inner_connections.sql:ro
       - ./database/migrations/014_remove_seed_pending_introduction_requests.sql:/docker-entrypoint-initdb.d/15_remove_seed_pending_introduction_requests.sql:ro
+      - ./database/migrations/015_demonstration_graph_repair.sql:/docker-entrypoint-initdb.d/16_demonstration_graph_repair.sql:ro
+      - ./database/migrations/016_unified_secondary_fts.sql:/docker-entrypoint-initdb.d/17_unified_secondary_fts.sql:ro
+      - ./database/migrations/017_branch_only_unified_secondary.sql:/docker-entrypoint-initdb.d/18_branch_only_unified_secondary.sql:ro
+      - ./database/migrations/018_dashboard_user_summary.sql:/docker-entrypoint-initdb.d/19_dashboard_user_summary.sql:ro
     ports:
       - "5433:5432"
     healthcheck:

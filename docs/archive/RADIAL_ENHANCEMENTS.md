@@ -1,3 +1,5 @@
+> **Archived.** Targets legacy `RadialContactWheel`; not used by current Contacts radial path. See [`../UI_CHANGE_GUIDANCE.md`](../UI_CHANGE_GUIDANCE.md).
+
 # Radial UI Enhancements – Implementation Summary
 
 ## ✅ Completed Enhancements

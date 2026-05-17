@@ -11,6 +11,8 @@ const connectionsRouter = require('./routes/connections');
 const connectionRequestsRouter = require('./routes/connectionRequests');
 const contactsRouter = require('./routes/contacts');
 const themesRouter = require('./routes/themes');
+const meRouter = require('./routes/me');
+const { startDashboardRollupScheduler } = require('./services/dashboardRollup');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,7 +34,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-eval'"], // Required for @spaceymonk/react-radial-menu
+      scriptSrc: ["'self'", "'unsafe-eval'"], // Legacy: @spaceymonk/react-radial-menu (not imported by routed UI; removable with CSP tighten)
       styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for Framer Motion
       imgSrc: ["'self'", 'data:', 'blob:'],
       connectSrc: ["'self'"],
@@ -75,10 +77,12 @@ app.use('/api/connections', requireAuth, connectionsRouter);
 app.use('/api/connection-requests', requireAuth, connectionRequestsRouter);
 app.use('/api/contacts', requireAuth, contactsRouter);
 app.use('/api/themes', themesRouter);
+app.use('/api/me', requireAuth, meRouter);
 
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
     console.log('API listening on http://localhost:' + PORT);
+    startDashboardRollupScheduler();
   });
 }
 

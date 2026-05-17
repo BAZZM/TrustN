@@ -1,13 +1,10 @@
 /**
- * Central config for the dial contact screen.
- * Edit this file to change ring limits, labels, placeholders, and section behaviour
- * without touching DemiRadialNetwork or Contacts.js.
+ * Central config for the dial contact screen (`DialContactScreen`).
+ * Edit ring limits, labels, placeholders, and section behaviour here.
  *
- * Sections:
- * - Toolbar: search (DialToolbar.js)
- * - Ring controls: inner/secondary sliders + optional filters (DialRingControls.js)
- * - Wheel: DemiRadialNetwork (unchanged)
- * - Info panel: inside DemiRadialNetwork (InnerInfoRing)
+ * Sections (current implementation):
+ * - Toolbar: search (`DialToolbar.js`)
+ * - Rings: inner / secondary / prospective lists rendered in `DialContactScreen.js`
  */
 export const DIAL_CONFIG = {
   /** Inner ring (direct connections) */

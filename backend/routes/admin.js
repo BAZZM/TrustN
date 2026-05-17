@@ -72,6 +72,38 @@ router.patch('/config/:key', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// Operational snapshot for admins (API reachability is implicit — caller got here)
+router.get('/system-health', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    let databaseReachable = false;
+    try {
+      await pool.query('SELECT 1');
+      databaseReachable = true;
+    } catch (_) {
+      databaseReachable = false;
+    }
+
+    const rollupRows = await pool.query(
+      `SELECT MAX(computed_at) AS last_computed_at FROM dashboard_user_summary`
+    );
+    const userRows = await pool.query(`SELECT COUNT(*)::INTEGER AS n FROM users`);
+
+    res.json({
+      api: { ok: true },
+      database: { reachable: databaseReachable },
+      rollup: {
+        last_computed_at: rollupRows.rows[0]?.last_computed_at || null,
+      },
+      platform: {
+        registered_users: userRows.rows[0]?.n ?? 0,
+      },
+    });
+  } catch (err) {
+    console.error('admin/system-health GET error:', err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // GET single config value (for auth flow - require_phone_verification)
 router.get('/config/require_phone_verification/value', async (req, res) => {
   try {

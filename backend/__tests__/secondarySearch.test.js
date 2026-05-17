@@ -93,7 +93,7 @@ describe('GET /api/connections/secondary-search', () => {
     expect(ids).not.toContain(nomatch.id);
   });
 
-  test('focused_inner_peer_id restricts discovery but keeps secondary edges', async () => {
+  test('focused_inner_peer_id restricts discovery; default hybrid still keeps secondary edges', async () => {
     const viewer = await createUser({ name: 'Viewer' });
     const inner1 = await createUser({ name: 'Inner1' });
     const inner2 = await createUser({ name: 'Inner2' });
@@ -132,6 +132,79 @@ describe('GET /api/connections/secondary-search', () => {
     expect(ids).toContain(onlyViaInner1.id);
     expect(ids).not.toContain(onlyViaInner2.id);
     expect(ids).toContain(edgeBuddy.id);
+  });
+
+  test('branch_only=1 with focused inner returns discovery peers only (excludes edge-only secondaries)', async () => {
+    const viewer = await createUser({ name: 'Viewer' });
+    const inner1 = await createUser({ name: 'Inner1' });
+    const inner2 = await createUser({ name: 'Inner2' });
+    const onlyViaInner1 = await createUser({
+      name: 'I1CandB',
+      job_role: 'A',
+      industry: 'B',
+      experience: '',
+    });
+    const onlyViaInner2 = await createUser({
+      name: 'I2CandB',
+      job_role: 'C',
+      industry: 'D',
+      experience: '',
+    });
+    const edgeBuddy = await createUser({
+      name: 'EdgeBuddyB',
+      job_role: 'E',
+      industry: 'F',
+      experience: '',
+    });
+
+    await createInnerConnection(viewer.id, inner1.id);
+    await createInnerConnection(viewer.id, inner2.id);
+    await createInnerConnection(inner1.id, onlyViaInner1.id);
+    await createInnerConnection(inner2.id, onlyViaInner2.id);
+    await createSecondaryConnection(viewer.id, edgeBuddy.id);
+
+    const res = await request(app)
+      .get('/api/connections/secondary-search')
+      .query({ focused_inner_peer_id: inner1.id, branch_only: '1' })
+      .set(authHeader(viewer.id));
+
+    expect(res.status).toBe(200);
+    expect(res.body.branch_only).toBe(true);
+    const ids = res.body.results.map((r) => r.peer_id);
+    expect(ids).toContain(onlyViaInner1.id);
+    expect(ids).not.toContain(onlyViaInner2.id);
+    expect(ids).not.toContain(edgeBuddy.id);
+  });
+
+  test('branch_only=1 with FTS q still filters branch candidates', async () => {
+    const viewer = await createUser({ name: 'Viewer' });
+    const inner = await createUser({ name: 'Inner' });
+    const matchUser = await createUser({
+      name: 'Zebra Alpha',
+      job_role: 'Llama Specialist',
+      industry: 'Zoo',
+      experience: '',
+    });
+    const other = await createUser({
+      name: 'Quiet Beta',
+      job_role: 'Engineer',
+      industry: 'Software',
+      experience: '',
+    });
+
+    await createInnerConnection(viewer.id, inner.id);
+    await createInnerConnection(inner.id, matchUser.id);
+    await createInnerConnection(inner.id, other.id);
+
+    const res = await request(app)
+      .get('/api/connections/secondary-search')
+      .query({ focused_inner_peer_id: inner.id, branch_only: '1', q: 'llama' })
+      .set(authHeader(viewer.id));
+
+    expect(res.status).toBe(200);
+    const ids = res.body.results.map((r) => r.peer_id);
+    expect(ids).toContain(matchUser.id);
+    expect(ids).not.toContain(other.id);
   });
 
   test('focus on non-inner peer returns empty candidates', async () => {

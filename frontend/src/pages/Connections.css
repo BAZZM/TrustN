@@ -143,6 +143,18 @@
   display: block;
 }
 
+/* Let clicks reach real nodes / backdrop handler — thin rings and edges are not interactive chrome. */
+.connections__graph-svg-bg,
+.connections__guide-ring,
+.connections__guide-ring--inner,
+.connections__edge {
+  pointer-events: none;
+}
+
+.connections__status-label {
+  pointer-events: none;
+}
+
 .connections__guide-ring {
   fill: none;
   stroke: rgba(255, 255, 255, 0.08);
@@ -266,6 +278,11 @@
 .connections__inner-node:focus-visible .connections__inner-node__core {
   stroke: rgba(255, 255, 255, 0.96);
   stroke-width: 2.4;
+}
+
+/* Decorative count pill only — clicks pass through to inner-ring nodes drawn beneath it. */
+.connections__overflow-chip {
+  pointer-events: none;
 }
 
 .connections__overflow-chip rect {

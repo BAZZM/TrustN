@@ -12,6 +12,19 @@ import {
   truncateLabel,
 } from "./graphLayout";
 
+/** Selectors for hits that must not bubble up as “background tap” (would clear branch focus). */
+const GRAPH_INTERACTIVE_HIT =
+  ".connections__inner-node, .connections__secondary-node, .connections__secondary-quickadd, .connections__overflow-chip";
+
+function graphClickWasOnInteractiveSurface(nativeEvent) {
+  if (typeof nativeEvent?.composedPath === "function") {
+    const path = nativeEvent.composedPath();
+    return path.some((n) => n instanceof Element && n.closest?.(GRAPH_INTERACTIVE_HIT));
+  }
+  const t = nativeEvent?.target;
+  return t instanceof Element && Boolean(t.closest(GRAPH_INTERACTIVE_HIT));
+}
+
 function Node({
   node,
   label,
@@ -26,6 +39,8 @@ function Node({
 }) {
   const rootClass = [className, selected ? `${className}--selected` : ""].filter(Boolean).join(" ");
   const downRef = useRef(null);
+  /** After pointer-up activation (desktop), ignore the synthetic click so secondary pick doesn’t toggle twice. */
+  const suppressClickRef = useRef(false);
 
   function pointerDown(e) {
     if (disabled || tapSlop <= 0) return;
@@ -42,8 +57,19 @@ function Node({
       const d = Math.hypot(e.clientX - downRef.current.x, e.clientY - downRef.current.y);
       downRef.current = null;
       if (d > tapSlop) return;
+      e.preventDefault();
       e.stopPropagation();
       onSelect?.(node);
+      return;
+    }
+    if (tapSlop <= 0) {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.stopPropagation();
+      suppressClickRef.current = true;
+      onSelect?.(node);
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
     }
   }
 
@@ -56,12 +82,13 @@ function Node({
       tabIndex={disabled ? -1 : 0}
       role={disabled ? undefined : "button"}
       aria-label={disabled ? undefined : label}
-      onPointerDown={tapSlop ? pointerDown : undefined}
-      onPointerUp={tapSlop ? pointerUp : undefined}
+      onPointerDown={disabled ? undefined : pointerDown}
+      onPointerUp={disabled ? undefined : pointerUp}
       onPointerCancel={tapSlop ? () => { downRef.current = null; } : undefined}
       onClick={(event) => {
         event.stopPropagation();
-        if (tapSlop) return;
+        if (tapSlop > 0) return;
+        if (suppressClickRef.current) return;
         if (!disabled) {
           onSelect?.(node);
         }
@@ -156,7 +183,12 @@ export default function ConnectionsGraph({
       viewBox={`0 0 ${GRAPH_VIEWBOX} ${GRAPH_VIEWBOX}`}
       aria-label={t("connections.graphTitle")}
     >
-      <rect width={GRAPH_VIEWBOX} height={GRAPH_VIEWBOX} fill="transparent" />
+      <rect
+        className="connections__graph-svg-bg"
+        width={GRAPH_VIEWBOX}
+        height={GRAPH_VIEWBOX}
+        fill="transparent"
+      />
       <defs>
         <linearGradient id="connections-quickadd-bevel" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="rgba(255,255,255,0.38)" />
@@ -227,6 +259,63 @@ export default function ConnectionsGraph({
         </text>
       </g>
 
+      {/* Secondary bodies first; quick-add next; inner ring last so mouse/touch hits faded inners over overlapping branch UI. */}
+      {secondaryLayout.map((node) => (
+        <g key={`secondary-wrap-${node.id}`} className="connections__secondary-branch">
+          <Node
+            node={node}
+            label={node.name}
+            className="connections__secondary-node"
+            labelClassName="connections__secondary-label"
+            onSelect={onSelectSecondary}
+            disabled={!onSelectSecondary}
+            selected={Boolean(selectedSecondaryId && selectedSecondaryId === node.id)}
+            motionTransition={nodeMotionTransition}
+            hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
+            tapSlop={immersive ? tapSlop : 0}
+          />
+        </g>
+      ))}
+
+      {secondaryLayout.map((node) => {
+        const targetKey = node.rawId != null ? String(node.rawId) : "";
+        const hasPendingLookup =
+          pendingIntroTargetIds &&
+          typeof pendingIntroTargetIds.has === "function" &&
+          targetKey;
+        const tripletPending = hasPendingLookup ? pendingIntroTargetIds.has(targetKey) : false;
+        const showChip = Boolean(onSecondaryQuickAdd && !tripletPending);
+        if (!showChip) return null;
+        return (
+          <g
+            key={`secondary-quickadd-${node.id}`}
+            role="button"
+            tabIndex={0}
+            aria-label={t("connections.graphQuickAddAria")}
+            className="connections__secondary-quickadd"
+            transform={`translate(${node.x + node.radius * 0.92}, ${node.y - node.radius * 0.92})`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSecondaryQuickAdd(node);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                onSecondaryQuickAdd(node);
+              }
+            }}
+          >
+            <circle r={14} className="connections__secondary-quickadd-hit" />
+            <circle r={8} className="connections__secondary-quickadd-face" fill="url(#connections-quickadd-bevel)" />
+            <text textAnchor="middle" dominantBaseline="central" className="connections__secondary-quickadd-plus">
+              +
+            </text>
+          </g>
+        );
+      })}
+
       {innerLayout.map((node) => (
         <Node
           key={`inner-node-${node.id}`}
@@ -243,60 +332,6 @@ export default function ConnectionsGraph({
           tapSlop={tapSlop}
         />
       ))}
-
-      {secondaryLayout.map((node) => {
-        const targetKey = node.rawId != null ? String(node.rawId) : "";
-        const hasPendingLookup =
-          pendingIntroTargetIds &&
-          typeof pendingIntroTargetIds.has === "function" &&
-          targetKey;
-        const tripletPending = hasPendingLookup ? pendingIntroTargetIds.has(targetKey) : false;
-        const showChip = Boolean(onSecondaryQuickAdd && !tripletPending);
-
-        return (
-          <g key={`secondary-wrap-${node.id}`} className="connections__secondary-branch">
-            <Node
-              node={node}
-              label={node.name}
-              className="connections__secondary-node"
-              labelClassName="connections__secondary-label"
-              onSelect={onSelectSecondary}
-              disabled={!onSelectSecondary}
-              selected={Boolean(selectedSecondaryId && selectedSecondaryId === node.id)}
-              motionTransition={nodeMotionTransition}
-              hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
-              tapSlop={immersive ? tapSlop : 0}
-            />
-            {showChip ? (
-              <g
-                role="button"
-                tabIndex={0}
-                aria-label={t("connections.graphQuickAddAria")}
-                className="connections__secondary-quickadd"
-                transform={`translate(${node.x + node.radius * 0.92}, ${node.y - node.radius * 0.92})`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSecondaryQuickAdd(node);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onSecondaryQuickAdd(node);
-                  }
-                }}
-              >
-                <circle r={14} className="connections__secondary-quickadd-hit" />
-                <circle r={8} className="connections__secondary-quickadd-face" fill="url(#connections-quickadd-bevel)" />
-                <text textAnchor="middle" dominantBaseline="central" className="connections__secondary-quickadd-plus">
-                  +
-                </text>
-              </g>
-            ) : null}
-          </g>
-        );
-      })}
 
       {focusUserId && hiddenSecondaryCount > 0 && (
         <g className="connections__overflow-chip" transform={`translate(${GRAPH_CENTER} 30)`}>
@@ -380,8 +415,9 @@ export default function ConnectionsGraph({
           ref={viewportRef}
           className="connections__graph-stage connections__graph-stage--immersive"
           role="presentation"
-          onClick={() => {
+          onClick={(e) => {
             if (consumeShouldIgnoreTap()) return;
+            if (graphClickWasOnInteractiveSurface(e.nativeEvent)) return;
             onResetFocus();
           }}
         >
@@ -451,7 +487,14 @@ export default function ConnectionsGraph({
         </p>
       </div>
 
-      <div className="connections__graph-stage" onClick={onResetFocus} role="presentation">
+      <div
+        className="connections__graph-stage"
+        onClick={(e) => {
+          if (graphClickWasOnInteractiveSurface(e.nativeEvent)) return;
+          onResetFocus();
+        }}
+        role="presentation"
+      >
         {graphSvg}
       </div>
 

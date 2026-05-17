@@ -36,6 +36,7 @@ The React app is built with `**REACT_APP_API_URL=https://trustn-api.fly.dev`** s
 | `[frontend/fly.toml](../frontend/fly.toml)`                             | Web: nginx on port **80**, small VM.                                                                                                              |
 | `[frontend/Dockerfile.fly](../frontend/Dockerfile.fly)`                 | CRA `**npm run build`** + nginx with `[nginx/fly-static.conf](../frontend/nginx/fly-static.conf)`.                                                |
 | `[backend/scripts/db-bootstrap.js](../backend/scripts/db-bootstrap.js)` | Runs on `**release_command`** if DB empty (strips BOM, applies `schema.sql` + ordered migrations).                                                |
+| `[backend/scripts/verify-migration-parity.js](../backend/scripts/verify-migration-parity.js)` | Run **`npm run verify:migrations`** from **`backend/`** after editing **`docker-compose.yml`** DB mounts or **`database/migrations/`**. |
 
 
 ---
@@ -108,7 +109,7 @@ Skip to **§5** if `trustn-db`, `trustn-api`, and `trustn-web` already exist in 
    cd /path/to/trust-network-connections-rebuild
    flyctl deploy --config backend/fly.toml -a trustn-api --yes
   ```
-   The `**release_command**` runs `node scripts/db-bootstrap.js` once per deploy if the DB has no `public.users` table yet. Subsequent deploys pick up new `database/migrations/*.sql` entries via `schema_version` (for example `016_unified_secondary_fts`: `user_search_vector`, trigger, `app_unified_secondary_search`, FTS backfill).
+   The `**release_command**` runs `node scripts/db-bootstrap.js` once per deploy if the DB has no `public.users` table yet. Subsequent deploys pick up new `database/migrations/*.sql` entries via `schema_version` (for example `016_unified_secondary_fts` for FTS + `app_unified_secondary_search`, and `017_branch_only_unified_secondary` for optional `branch_only` / branch-focused listings).
 6. **Deploy Web** — **must** use `**frontend/`** as the working directory so upload size stays small:
   ```bash
    cd frontend
@@ -127,16 +128,17 @@ Skip to **§5** if `trustn-db`, `trustn-api`, and `trustn-web` already exist in 
 Someone with **Git access** and `**flyctl auth`** to the same Fly org:
 
 1. `git pull`
-2. **API** (from repo root):
+2. **`cd backend && npm run verify:migrations`** (recommended when touching `database/migrations/` or `docker-compose.yml`)
+3. **API** (from repo root):
   ```bash
    flyctl deploy --config backend/fly.toml -a trustn-api --yes
   ```
-3. **Web** (if JS/CSS/API URL changed — **re-bake** `REACT_APP_API_URL` when API hostname changes):
+4. **Web** (if JS/CSS/API URL changed — **re-bake** `REACT_APP_API_URL` when API hostname changes):
   ```bash
    cd frontend
    flyctl deploy . -a trustn-web --build-arg REACT_APP_API_URL=https://trustn-api.fly.dev --yes
   ```
-4. **Secrets only** (no full deploy):
+5. **Secrets only** (no full deploy):
   `flyctl secrets set -a trustn-api KEY=value` then **redeploy API** so the process sees new env (Fly injects secrets at deploy).
 
 ---
@@ -180,6 +182,7 @@ Create a **[personal access token](https://fly.io/user/personal_access_tokens)**
 ## 9. Quick command cheat sheet
 
 ```text
+cd backend && npm run verify:migrations
 flyctl apps list
 flyctl status -a trustn-db
 flyctl status -a trustn-api

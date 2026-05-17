@@ -1,5 +1,6 @@
 const express = require('express');
 const { pool, withUserContext } = require('../db');
+const { emitAnalyticsEvent } = require('../services/analyticsEmit');
 
 const router = express.Router();
 
@@ -101,6 +102,15 @@ router.post('/', async (req, res) => {
          VALUES ($1, $2, $3, 'pending', $4) RETURNING id, requester_id, target_user_id, intermediary_id, circle_type, created_at`,
         [requesterIdInt, target_user_id, cType === 'secondary' ? intermediary_id : null, cType]
       );
+      emitAnalyticsEvent(pool, {
+        userId: requesterIdInt,
+        eventType: 'intro_request_created',
+        payload: {
+          circle_type: cType,
+          target_user_id: Number(target_user_id),
+          intermediary_id: intermediary_id != null ? Number(intermediary_id) : null,
+        },
+      });
       res.status(201).json(ins.rows[0]);
     });
   } catch (err) {

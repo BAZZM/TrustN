@@ -115,6 +115,20 @@ CREATE TABLE users (
 4. Applies optional filters for `job_role` and `industry`
 5. Returns filtered list ordered by name
 
+#### 2b. Unified secondary search (hybrid discovery + FTS)
+
+**Endpoint**: `GET /api/connections/secondary-search`
+
+**Query parameters**:
+- `q` (optional): Full-text search on profile fields (`users.user_search_vector`)
+- `limit` / `offset` (optional): Pagination (cap 200)
+- `focused_inner_peer_id` (optional): Restrict relationship-discovery computation to one inner peer (must be viewer’s inner)
+- `branch_only` (optional, `1` / `true`): When combined with `focused_inner_peer_id`, return **only** peers reachable via **`app_secondary_for`** through that inner—as if browsing **that branch**. Omitting `branch_only` (default **false**) keeps the legacy **hybrid** behavior: **union** of (all viewer `secondary` edges) ∪ (discovery rows). **FTS `q` applies in all modes** after candidate selection.
+
+**Used by**: Connections graph (focused inner sends `branch_only=1`), Contacts radial when an inner is selected (`branch_only=1`); hybrid catalog when no inner focus.
+
+**SQL**: `database/migrations/016_unified_secondary_fts.sql` defines `app_unified_secondary_search`; `017_branch_only_unified_secondary.sql` adds `p_branch_only`.
+
 #### 3. Get Inner Circle Contact Profile
 **Endpoint**: `GET /api/connections/inner-circle/:userId/profile`
 

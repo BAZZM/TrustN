@@ -34,10 +34,14 @@ Or: `.\scripts\docker-rebuild.ps1 -Reset` / `./scripts/docker-rebuild.sh --reset
 
 ## Database init order
 
-On first start, Postgres runs in order:
-1. 01_schema.sql - base tables
-2. 02_migrations.sql - themes, user preferences, circle_type
-3. 03_schema_version_and_instances.sql - schema_version, instances, locales
+On **first** Postgres start only, init scripts under `/docker-entrypoint-initdb.d/` run in **filename order**:
+
+1. `01_schema.sql` → `database/schema.sql`
+2. `02_migrations.sql` through `18_*.sql` → each file in `database/migrations/` from **`001_` … `017_`** (one mount per migration), same order as [`backend/__tests__/helpers/testDb.js`](../backend/__tests__/helpers/testDb.js) `MIGRATION_ORDER` and [`backend/scripts/db-bootstrap.js`](../backend/scripts/db-bootstrap.js) (sorted filenames).
+
+**Fly.io:** new databases get **`schema.sql`** + the same migrations via **`release_command`** `node scripts/db-bootstrap.js` (see [`deploy/FLY.md`](../deploy/FLY.md)).
+
+**Parity check:** from `backend/`, run `npm run verify:migrations` — fails if Compose mounts, Jest order, and files on disk diverge.
 
 ## Environment
 

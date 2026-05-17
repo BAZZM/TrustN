@@ -41,11 +41,13 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Unified hybrid discovery: union of stored secondary edges + relationship-based discovery
- * (SECURITY DEFINER app_unified_secondary_search). Optional focused_inner_peer_id scopes discovery
- * to one inner peer (Connections graph focus) while keeping all stored secondary edges visible.
+ * Unified hybrid discovery (SECURITY DEFINER app_unified_secondary_search).
+ * Optional focused_inner_peer_id scopes relationship discovery to one inner peer.
+ * Optional branch_only=1: when focused_inner_peer_id is set, return only peers reachable via that
+ * inner’s discovery paths (exclude viewer secondary edges that are not discovered through that branch).
+ * FTS q still applies on top.
  *
- * Query: q (FTS), limit (max 200), offset, focused_inner_peer_id (optional)
+ * Query: q (FTS), limit (max 200), offset, focused_inner_peer_id (optional), branch_only (optional)
  */
 router.get('/secondary-search', async (req, res) => {
   try {
@@ -74,6 +76,14 @@ router.get('/secondary-search', async (req, res) => {
       }
     }
 
+    const rawBranch =
+      req.query.branch_only ?? req.query.branchOnly ?? req.query.branch_only_mode;
+    const branchOnly =
+      rawBranch === true ||
+      rawBranch === 1 ||
+      String(rawBranch || '').toLowerCase() === 'true' ||
+      String(rawBranch || '') === '1';
+
     const { rows } = await withUserContext(viewerIdInt, async (client) =>
       client.query(
         `SELECT uni.res_peer_id,
@@ -85,8 +95,8 @@ router.get('/secondary-search', async (req, res) => {
                 uni.res_source_edge,
                 uni.res_via_inner_peer_ids,
                 uni.res_search_rank
-         FROM app_unified_secondary_search($1, $2, $3, $4, NULL::INTEGER, $5::INTEGER) AS uni`,
-        [viewerIdInt, qParam, limit, offset, focusInner]
+         FROM app_unified_secondary_search($1, $2, $3, $4, NULL::INTEGER, $5::INTEGER, $6::BOOLEAN) AS uni`,
+        [viewerIdInt, qParam, limit, offset, focusInner, branchOnly]
       )
     );
 
@@ -117,6 +127,7 @@ router.get('/secondary-search', async (req, res) => {
       offset,
       q: qParam,
       focused_inner_peer_id: focusInner,
+      branch_only: branchOnly,
     });
   } catch (err) {
     console.error('connections/secondary-search error:', err.message, err.stack);

@@ -7,6 +7,7 @@
     "dev": "node server.js",
     "seed:graph": "node scripts/seed-graph-demo.js",
     "db:bootstrap": "node scripts/db-bootstrap.js",
+    "verify:migrations": "node scripts/verify-migration-parity.js",
     "test": "jest --runInBand --forceExit",
     "test:watch": "jest --watch --runInBand"
   },

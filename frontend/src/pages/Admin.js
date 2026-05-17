@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import axios from "axios";
+import { motion } from "framer-motion";
 import { useApp } from "../context/AppContext";
+import { useTranslations } from "../i18n";
 import "./Admin.css";
 
 export default function Admin() {
   const { user, baseURL, token } = useApp();
+  const t = useTranslations(user?.locale ? user.locale : "en");
   const [config, setConfig] = useState([]);
+  const [health, setHealth] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(null);
@@ -15,12 +18,18 @@ export default function Admin() {
     if (!user?.id || !token) return;
     setLoading(true);
     setError(null);
-    axios
-      .get(baseURL + "/api/admin/config")
-      .then((r) => setConfig(r.data.config || []))
+    Promise.all([
+        axios.get(baseURL + "/api/admin/config"),
+        axios.get(baseURL + "/api/admin/system-health"),
+      ])
+      .then(([cfgRes, healthRes]) => {
+        setConfig(cfgRes.data.config || []);
+        setHealth(healthRes.data);
+      })
       .catch((err) => {
         setError(err.response?.status === 403 ? "Admin access required" : err.response?.data?.error || "Failed to load");
         setConfig([]);
+        setHealth(null);
       })
       .finally(() => setLoading(false));
   }, [user, baseURL, token]);
@@ -40,6 +49,10 @@ export default function Admin() {
       })
       .finally(() => setSaving(null));
   }
+
+  const rollupTime =
+    health?.rollup?.last_computed_at &&
+    new Date(health.rollup.last_computed_at).toLocaleString();
 
   return (
     <motion.div
@@ -67,11 +80,43 @@ export default function Admin() {
 
       {loading && <p className="admin__loading">Loading…</p>}
 
+      {!loading && health && !error && (
+        <motion.section
+          className="admin__section admin__section--health"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+        >
+          <h2 className="admin__section-title">{t("admin.systemHealth")}</h2>
+          <p className="admin__section-hint">{t("admin.systemHealthHint")}</p>
+          <ul className="admin__health-list">
+            <li className="admin__health-row">
+              <span>{t("admin.apiOk")}</span>
+              <span className="admin__health-ok">{health.api?.ok ? "✓" : "—"}</span>
+            </li>
+            <li className="admin__health-row">
+              <span>{t("admin.dbReachable")}</span>
+              <span className={health.database?.reachable ? "admin__health-ok" : "admin__health-bad"}>
+                {health.database?.reachable ? "✓" : t("admin.dbUnreachable")}
+              </span>
+            </li>
+            <li className="admin__health-row">
+              <span>{t("admin.rollupUpdated")}</span>
+              <span>{rollupTime || "—"}</span>
+            </li>
+            <li className="admin__health-row">
+              <span>{t("admin.registeredUsers")}</span>
+              <span>{health.platform?.registered_users ?? "—"}</span>
+            </li>
+          </ul>
+        </motion.section>
+      )}
+
       {!loading && config.length === 0 && !error && (
         <p className="admin__empty">No config items.</p>
       )}
 
-      {!loading && config.length > 0 && (
+      {!loading && config.length > 0 && !error && (
         <motion.section
           className="admin__section"
           initial={{ opacity: 0, y: 8 }}

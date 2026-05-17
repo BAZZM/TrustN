@@ -37,6 +37,39 @@
   padding: var(--space-lg);
 }
 
+.admin__section--health {
+  margin-bottom: var(--space-lg);
+}
+
+.admin__health-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin__health-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.admin__health-row:last-child {
+  border-bottom: none;
+}
+
+.admin__health-ok {
+  color: var(--color-success);
+}
+
+.admin__health-bad {
+  color: var(--color-error);
+}
+
 .admin__section-title {
   margin: 0 0 var(--space-xs);
   font-size: 1rem;

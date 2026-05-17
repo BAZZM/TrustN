@@ -45,7 +45,12 @@ async function main() {
     process.exit(1);
   }
 
-  const databaseRoot = path.join(__dirname, '..', 'database');
+  const ssl =
+    /127\.0\.0\.1|localhost/i.test(url) ? undefined : { rejectUnauthorized: false };
+
+  const bundledDb = path.join(__dirname, '..', 'database');
+  const repoDb = path.join(__dirname, '..', '..', 'database');
+  const databaseRoot = fs.existsSync(path.join(bundledDb, 'schema.sql')) ? bundledDb : repoDb;
   const schemaPath = path.join(databaseRoot, 'schema.sql');
   const migDir = path.join(databaseRoot, 'migrations');
 
@@ -54,7 +59,7 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const client = new Client({ connectionString: url, ssl });
   await client.connect();
 
   const stripBom = (t) => (t.charCodeAt(0) === 0xfeff ? t.slice(1) : t);

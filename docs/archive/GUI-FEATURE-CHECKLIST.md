@@ -1,3 +1,5 @@
+> **Archived (historical).** Not referenced by build tooling or runtime. Current UI map: [`../UI_CHANGE_GUIDANCE.md`](../UI_CHANGE_GUIDANCE.md).
+
 # GUI & feature checklist (from questionnaire + extras)
 
 ## 1. Overall feel

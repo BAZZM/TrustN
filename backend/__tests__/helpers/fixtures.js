@@ -6,6 +6,7 @@ const { pool } = require('../../db');
 // user-generated rows below ids that we'll insert.
 async function resetDynamicData() {
   // TRUNCATE access_requests + connections; reset their sequences so ids are predictable per test.
+  await pool.query(`TRUNCATE TABLE dashboard_user_summary`);
   await pool.query(`
     TRUNCATE TABLE access_requests RESTART IDENTITY CASCADE;
     TRUNCATE TABLE connections RESTART IDENTITY CASCADE;

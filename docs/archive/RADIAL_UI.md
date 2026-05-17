@@ -1,6 +1,8 @@
+> **Archived.** Describes legacy radial layouts (`DemiRadialNetwork` / disk wheel) **not mounted** from current routes. Contacts radial is [`DialContactScreen`](../../frontend/src/components/dial/DialContactScreen.js). See [`../UI_CHANGE_GUIDANCE.md`](../UI_CHANGE_GUIDANCE.md).
+
 # Radial Contact UI – Design & Implementation
 
-The Contacts page **radial view** uses **DemiRadialNetwork**: a semi-circular dual-ring interface with apex at top, primary (inner) and secondary connections, and an inner info ring. Full design decisions and behavior are in **`docs/DEMI_RADIAL_SPEC.md`**.
+The Contacts page **radial view** uses **DemiRadialNetwork**: a semi-circular dual-ring interface with apex at top, primary (inner) and secondary connections, and an inner info ring. Full design decisions and behavior are in **[`DEMI_RADIAL_SPEC.md`](DEMI_RADIAL_SPEC.md)** (archived sibling).
 
 ---
 
@@ -52,7 +54,7 @@ The Contacts page **radial view** uses **DemiRadialNetwork**: a semi-circular du
 | `frontend/src/components/DemiRadialNetwork.js` | Semi-circular arc, primary/secondary rings, InnerInfoRing, prospective strip. |
 | `frontend/src/components/DemiRadialNetwork.css` | Styles for nodes, info ring, chips, buttons. |
 | `frontend/src/pages/Contacts.js` | View mode, data fetch, search filter, DemiRadialNetwork integration. |
-| `docs/DEMI_RADIAL_SPEC.md` | Full design decisions, geometry, motion, props API, data model. |
+| [`DEMI_RADIAL_SPEC.md`](DEMI_RADIAL_SPEC.md) | Full design decisions, geometry, motion, props API, data model. |
 
 ---
 

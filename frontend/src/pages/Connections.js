@@ -24,6 +24,19 @@ function secondaryIntroEligibleViaFocusedInner(graphNode, focusedInnerRawId) {
   return vias.some((id) => Number(id) === inner);
 }
 
+/** Higher score = show earlier on the branch arc when an inner peer is focused (discovery rows beat orphan edges). */
+function secondaryBranchArcPriority(norm, focusedRawId) {
+  const inner = Number(focusedRawId);
+  const raw = norm?.raw;
+  const vias = raw?.via_inner_peer_ids;
+  const viaHere =
+    Number.isFinite(inner) && Array.isArray(vias) && vias.some((id) => Number(id) === inner);
+  const edge = Array.isArray(raw?.sources) && raw.sources.includes("edge");
+  if (viaHere) return 2;
+  if (edge) return 1;
+  return 0;
+}
+
 export default function Connections() {
   const location = useLocation();
   const { user, baseURL } = useApp();
@@ -134,7 +147,7 @@ export default function Connections() {
       return [];
     }
 
-    return (unifiedSecondaryRows || [])
+    const mapped = (unifiedSecondaryRows || [])
       .map((item) =>
         normalizeGraphNode(
           {
@@ -145,7 +158,18 @@ export default function Connections() {
         )
       )
       .filter(Boolean);
-  }, [focusUserId, unifiedSecondaryRows]);
+
+    const fid = focusedConnection?.rawId;
+    if (fid == null) {
+      return mapped;
+    }
+
+    return [...mapped].sort((a, b) => {
+      const byPri = secondaryBranchArcPriority(b, fid) - secondaryBranchArcPriority(a, fid);
+      if (byPri !== 0) return byPri;
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+  }, [focusUserId, focusedConnection?.rawId, unifiedSecondaryRows]);
 
   const pickedSecondary = useMemo(
     () => secondaryConnections.find((s) => s.id === pickedSecondaryId) || null,
@@ -211,6 +235,7 @@ export default function Connections() {
     const params = new URLSearchParams({
       limit: "200",
       focused_inner_peer_id: String(focusInner),
+      branch_only: "1",
     });
     if (debouncedSecondaryQuery) {
       params.set("q", debouncedSecondaryQuery);

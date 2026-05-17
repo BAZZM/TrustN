@@ -1,6 +1,8 @@
-﻿# Trust Network (**TrustN**)
+# Trust Network (**TrustN**)
 
 Deploy to production with **[Fly.io](https://fly.io/)** using **`backend/fly.toml`**, **`frontend/fly.toml`**, and the Dockerfiles referenced there. Full **handoff / upload–download workflow** (what lives on Fly vs Git, provision, deploy, inspect): **[`deploy/FLY.md`](deploy/FLY.md)**.
+
+**AI / coding-agent context:** **[`AGENTS.md`](AGENTS.md)** and **[`.cursor/rules/`](.cursor/rules/)** (persistent checklist); UI specifics in **[`docs/UI_CHANGE_GUIDANCE.md`](docs/UI_CHANGE_GUIDANCE.md)**.
 
 ---
 

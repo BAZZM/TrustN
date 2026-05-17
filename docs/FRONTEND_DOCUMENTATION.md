@@ -7,14 +7,14 @@
 ```
 frontend/src/
 ├── components/
-│   ├── RadialContactWheel.js      # Radial disk UI with two rings
-│   ├── RadialContactWheel.css     # Styles for radial UI
-│   ├── RadialContactDetail.js     # Expandable detail panel
-│   └── RadialContactActions.js    # Nested radial menu (actions)
+│   └── connections/
+│       ├── ConnectionsGraph.js    # Trust graph (inner ring + branch secondaries, immersive mobile)
+│       ├── graphLayout.js          # Layout math shared by web / native
+│       └── UnifiedSecondarySearchBar.js
 ├── pages/
 │   ├── Login.js                   # Phone-based login
 │   ├── Contacts.js                # Contacts page (grid/list/radial views)
-│   ├── Connections.js              # Connections list
+│   ├── Connections.js             # Connections page + unified secondary search
 │   ├── Settings.js                # User preferences
 │   └── Dashboard.js               # Main dashboard
 ├── context/
@@ -71,6 +71,23 @@ frontend/src/
 
 ---
 
+## Connections page — Trust graph (`ConnectionsGraph.js`)
+
+Narrow viewports use an **immersive** graph (full stage + pinch/pan + bottom sheet). Desktop uses the same SVG inside a static stage.
+
+- **Inner ring**: Inner-circle peers (`circle_type === inner`), limited to `MAX_VISIBLE_INNER` on the ring; overflow appears in the sheet list.
+- **Focused branch**: Tap an inner peer to load candidates via `GET /api/connections/secondary-search` with `focused_inner_peer_id` and **`branch_only=1`** (relationship discovery through **that** inner only). The search box still sends **`q`** on top of that set (same endpoint).
+- **Reset**: Tap **outside** interactive nodes (backdrop / stage) to clear focus.
+- **Implementation notes** (order matters):
+  1. Secondary **node bodies**, then **quick-add “+”** chips, then **inner-ring nodes** (inners on top for hit-testing where arcs overlap).
+  2. **“+N more”** pill is painted above the ring but uses **`pointer-events: none`** so it never eats clicks meant for an inner peer underneath.
+  3. **Desktop (`tapSlop === 0`)**: nodes activate on **`pointerup`** (with **`click`** fallback for accessibility); a short-lived guard skips the duplicate **`click`** so secondary selection doesn’t double-toggle.
+  4. **Immersive** inner selection uses **`pointerUp` + tap slop**. The stage **`click`** handler clears focus only when the event did **not** originate from an interactive graph node (`composedPath` / `closest`).
+  5. Decorative SVG (full-viewbox backdrop rect, guide rings, edges, status labels) uses **`pointer-events: none`** so hits resolve to real controls.
+  6. **Branch listing**: the API uses **`branch_only=1`** when an inner is focused so the arc reflects **that inner’s discovery paths**; the UI may still sort rows for stability.
+
+---
+
 ## Form Accessibility
 
 All form inputs include:
@@ -87,30 +104,23 @@ All form inputs include:
 
 ## Content Security Policy (CSP)
 
-### Current Configuration
+### Effective configs (which file wins)
 
-**Backend** (`server.js`):
-```javascript
-scriptSrc: ["'self'", "'unsafe-eval'"]  // Required for radial menu
-styleSrc: ["'self'", "'unsafe-inline'"] // Required for Framer Motion
-```
+- **Docker Compose:** [`docker-compose.yml`](../docker-compose.yml) mounts **`frontend/nginx/default.conf`** over the container’s site config — **that** CSP applies at **`http://localhost`** / **`8080`**, not the stricter baseline baked from **`frontend/nginx.conf`** inside [`frontend/Dockerfile`](../frontend/Dockerfile).
+- **Fly.io:** **`frontend/nginx/fly-static.conf`**.
 
-**Frontend** (`nginx/default.conf`):
+Compose/Fly currently include **`script-src 'unsafe-eval'`** (historic **`@spaceymonk/react-radial-menu`** dependency — unused by routed UI today) and **`style-src 'unsafe-inline'`** for animation/CSS convenience.
+
+See **`docs/SECURITY-CSP.md`** (truth table) and **`docs/CSP_TIGHTENING_QUESTIONS.md`** before tightening runtime CSP.
+
+### Example directives (Compose / Fly — illustrative)
+
+**Mounted Compose site** (`frontend/nginx/default.conf`):
+
 ```nginx
 script-src 'self' 'unsafe-eval';
 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
 ```
-
-### Why These Directives?
-
-- **`unsafe-eval`**: Required by `@spaceymonk/react-radial-menu` library (uses `eval()` internally)
-- **`unsafe-inline`**: Required by Framer Motion for inline styles in animations
-
-### Security Considerations
-
-- `unsafe-eval` is a security risk but required for current radial menu implementation
-- Consider replacing radial menu library with eval-free alternative
-- `unsafe-inline` is acceptable for CSS animations but could be improved with nonces
 
 ---
 
@@ -184,4 +194,4 @@ npm run build  # Creates optimized build in `build/`
 
 ---
 
-*Last updated: 2025-02-16*
+*Last updated: 2026-05-05*

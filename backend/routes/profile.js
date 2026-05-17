@@ -1,5 +1,6 @@
 const express = require('express');
 const { pool } = require('../db');
+const { emitAnalyticsEvent } = require('../services/analyticsEmit');
 
 const router = express.Router();
 
@@ -48,6 +49,7 @@ router.patch('/', async (req, res) => {
       'SELECT id, phone, name, job_role, industry, experience, theme_id, large_text, high_contrast, locale, notifications_connection_requests FROM users WHERE id = $1',
       [userIdInt]
     );
+    emitAnalyticsEvent(pool, { userId: userIdInt, eventType: 'profile_updated', payload: {} });
     res.json(rows[0] || {});
   } catch (err) {
     console.error(err);

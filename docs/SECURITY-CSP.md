@@ -1,65 +1,57 @@
 # Content Security Policy and security headers
 
-## Overview
+## Source of truth (what ships today)
 
-The stack uses a **strict Content Security Policy (CSP)** so that:
+CSP is **not identical** everywhere; configure holistically when tightening.
 
-- **script-src** allows only `'self'` (no `unsafe-eval`, no `unsafe-inline`). This prevents `eval()`, `new Function()`, and string-based `setTimeout`/`setInterval` from running, reducing risk of injected script execution.
-- Inline script execution is not allowed; all scripts must be same-origin files (e.g. built JS from `/static/js/`).
+| Delivery | Config file | Effective CSP (summary) |
+|----------|-------------|-------------------------|
+| **Docker Compose** (`frontend` service) | **`frontend/nginx/default.conf`** mounted over `/etc/nginx/conf.d/default.conf` ([`docker-compose.yml`](../docker-compose.yml)) | **`script-src 'self' 'unsafe-eval'`**, **`style-src`** includes **`'unsafe-inline'`** + Google Fonts, **`connect-src 'self'`** (same-origin API via `/api/` proxy). |
+| **Fly.io static app** | **`frontend/nginx/fly-static.conf`** | Same CSP / framing / XSS / Permissions-Policy pattern as Compose **`default.conf`**; **`connect-src`** also allows **`https:`** and **`wss:`** (SPA calls separate API host). |
+| **Frontend image bake only** | **`frontend/nginx.conf`** copied in [`frontend/Dockerfile`](../frontend/Dockerfile) | Stricter document CSP (**`script-src 'self'`** only, no **`unsafe-eval`**, no style **`unsafe-inline`**). **Overridden** when Compose mounts **`default.conf`**. |
+| **Node API** | **`backend/server.js`** (Helmet) | **`script-src`** includes **`'unsafe-eval'`** (historic justification: **`@spaceymonk/react-radial-menu`** — currently unused from routed UI; see below). **`style-src`** allows **`'unsafe-inline'`**. |
 
-## Where CSP and headers are set (reproducible at build)
+Before tightening **`unsafe-eval`**, read **[`docs/CSP_TIGHTENING_QUESTIONS.md`](CSP_TIGHTENING_QUESTIONS.md)** and align **`server.js`**, **`nginx/default.conf`**, **`nginx/fly-static.conf`**, and **`nginx.conf`** (if still used without compose override) in **one change**.
 
-| Layer   | File(s) | When applied |
-|--------|---------|--------------|
-| Frontend (web) | `frontend/nginx/default.conf`, `frontend/nginx.conf` | Nginx adds `Content-Security-Policy` and other headers on every response. Config is in repo and copied at Docker build. |
-| Backend (API)  | `backend/server.js` (Helmet) | Helmet sets CSP and security headers on API responses. Applied at server start. |
+---
 
-No runtime secrets are required for the base CSP; it is fully defined in version-controlled config.
+## Why `unsafe-eval` appeared
 
-## Frontend CSP (nginx)
+Comments in **`server.js`** and nginx cite **`@spaceymonk/react-radial-menu`**. That package is imported only from **`RadialContactActions.js`**, which is **not imported** by any page under **`App.js`**. Legacy radial docs live under **`docs/archive/`**.
 
-The directive is:
+Removing dead imports + that dependency is the prerequisite most teams want **before** dropping **`unsafe-eval`**.
 
-```
-default-src 'self';
-script-src 'self';
-style-src 'self' https://fonts.googleapis.com;
-font-src 'self' https://fonts.gstatic.com data:;
-img-src 'self' data: blob:;
-connect-src 'self';
-base-uri 'self';
-form-action 'self';
-frame-ancestors 'self'
-```
+---
 
-- **script-src 'self'** – Only scripts from the same origin (e.g. `/static/js/main.*.js`) are allowed. No `unsafe-eval` or `unsafe-inline`.
-- **style-src** – Same-origin styles plus Google Fonts CSS (used in `index.html`).
-- **font-src** – Same-origin, `https://fonts.gstatic.com`, and `data:` for font data URIs.
-- **connect-src 'self'** – API calls go to same origin (`/api/` proxied by nginx).
+## Backend (Helmet) snippet location
 
-Other headers set in nginx: `X-Frame-Options`, `X-Content-Type-Options`, `X-XSS-Protection`, `Referrer-Policy`, `Permissions-Policy`.
+See **`backend/server.js`** → `helmet({ contentSecurityPolicy: { directives: { … }}})`. **`hsts`** is disabled so plain HTTP local URLs keep working.
 
-## Backend (Helmet)
+---
 
-Helmet is configured with a strict CSP (script-src `'self'` only, no `unsafe-eval`) and default security headers. HSTS is disabled by default so local HTTP works; enable it in production when serving over HTTPS.
+## Frontend nginx snippets location
 
-## Reproducing at build
+- **Compose runtime:** [`frontend/nginx/default.conf`](../frontend/nginx/default.conf) — CSP **`add_header`** block near top of `server`.
+- **Fly:** [`frontend/nginx/fly-static.conf`](../frontend/nginx/fly-static.conf) — CSP aligns with Compose; **`connect-src`** additionally allows **`https:`** / **`wss:`** for the separate API origin.
+- **Image-only baseline:** [`frontend/nginx.conf`](../frontend/nginx.conf) — CSP at **`http`** level.
 
-1. **Frontend:** Rebuild the image; nginx config is copied in the Dockerfile and (if used) overridden by the compose volume mount. CSP is whatever is in the committed nginx config.
-2. **Backend:** Restart the API container; Helmet config is in `server.js`. Rebuilding the backend image picks up any change.
+Compose **`default.conf`** and **`fly-static.conf`** both set **`X-XSS-Protection`** and **`Permissions-Policy`** (as well as framing / nosniff / referrer).
 
-To verify CSP in the browser: open DevTools → Network → select the document request → Response Headers → `Content-Security-Policy`.
+---
 
-## If you must allow string evaluation (not recommended)
+## Verification
 
-Allowing `unsafe-eval` weakens protection against script injection. If a dependency truly requires it:
+1. Open DevTools → **Network** → document (`/` or `/contacts`) → **Response Headers** → **`Content-Security-Policy`**.
+2. Repeat against **`https://trustn-web.fly.dev/`** (or your Fly hostname) after deploy.
+3. Hit **`/api/health`** and inspect API response CSP if you rely on Helmet for HTML/error bodies.
 
-- **Frontend (nginx):** Change `script-src 'self'` to `script-src 'self' 'unsafe-eval'` in `frontend/nginx/default.conf` and `frontend/nginx.conf`, then rebuild the frontend image.
-- Prefer removing or replacing the dependency that needs `eval` over enabling `unsafe-eval`.
+---
 
-## Production (HTTPS)
+## Hardening roadmap
 
-When the app is served over HTTPS you can:
+- Answer **[`CSP_TIGHTENING_QUESTIONS.md`](CSP_TIGHTENING_QUESTIONS.md)** (product + **`unsafe-inline`** strategy + env parity).
+- Prefer **`unsafe-eval` removal** after dependency/code cleanup; treat **`style-src`** separately if Framer Motion still needs inline styles.
 
-- Add `upgrade-insecure-requests` to the CSP in the nginx config.
-- Enable HSTS in Helmet (e.g. set `hsts: { maxAge: 31536000, includeSubDomains: true, preload: true }` in `server.js` or via env-driven config).
+---
+
+*Last updated: 2026-05-05*

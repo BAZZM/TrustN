@@ -1,3 +1,5 @@
+> **Archived.** Specification for `DemiRadialNetwork.js`, which is **not imported** by current app routes. See [`../UI_CHANGE_GUIDANCE.md`](../UI_CHANGE_GUIDANCE.md).
+
 # DemiRadialNetwork – Design Decisions & Specification
 
 Semi-circular dual-ring radial interface for direct (primary) and secondary connections. Resolved design decisions and full implementation spec.

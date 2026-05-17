@@ -57,7 +57,7 @@ export default function Contacts() {
     return { innerConnections: inner, secondaryConnections: secondary, prospectiveContacts: prospective, connectedPeerIds: peerIds };
   }, [connections, contacts]);
 
-  /** Hybrid secondary-search results (discovery ∪ edges); scope via selected inner when set */
+  /** Unified secondary-search; when an inner is selected, branch_only limits rows to that inner's discovery paths */
   const [hybridSecondaryResults, setHybridSecondaryResults] = useState([]);
   const [selectedInnerCircleUserId, setSelectedInnerCircleUserId] = useState(null);
   const [loadingHybridSecondaries, setLoadingHybridSecondaries] = useState(false);
@@ -86,6 +86,7 @@ export default function Contacts() {
     }
     if (selectedInnerCircleUserId != null) {
       params.set("focused_inner_peer_id", String(selectedInnerCircleUserId));
+      params.set("branch_only", "1");
     }
 
     axios
