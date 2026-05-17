@@ -19,6 +19,12 @@ const item = {
   show: { opacity: 1, y: 0 },
 };
 
+const quickLinks = [
+  { key: "connections", href: "/connections", labelKey: "dashboard.quickConnections", bodyKey: "dashboard.quickConnectionsBody" },
+  { key: "contacts", href: "/contacts", labelKey: "dashboard.quickContacts", bodyKey: "dashboard.quickContactsBody" },
+  { key: "activity", href: "/activity", labelKey: "dashboard.quickActivity", bodyKey: "dashboard.quickActivityBody" },
+];
+
 function replaceTpl(str, map) {
   let out = str;
   Object.entries(map).forEach(([k, v]) => {
@@ -130,6 +136,28 @@ export default function Dashboard() {
               </ul>
             </motion.div>
           )}
+
+          <motion.section
+            className="dashboard__quick"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.04 }}
+          >
+            <div className="dashboard__quick-head">
+              <h2 className="dashboard__quick-title">{t("dashboard.quickTitle")}</h2>
+              <p className="dashboard__quick-copy">{t("dashboard.quickBody")}</p>
+            </div>
+            <ul className="dashboard__quick-list">
+              {quickLinks.map((link) => (
+                <li key={link.key}>
+                  <Link to={link.href} className="dashboard__quick-link">
+                    <span className="dashboard__quick-link-title">{t(link.labelKey)}</span>
+                    <span className="dashboard__quick-link-body">{t(link.bodyKey)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </motion.section>
 
           <motion.ul
             className="dashboard__cards"

@@ -14,6 +14,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState({ name: "", job_role: "", industry: "", experience: "" });
   const [profileSaving, setProfileSaving] = useState(false);
+  const [status, setStatus] = useState(null);
 
   useEffect(function() {
     if (user) {
@@ -32,11 +33,16 @@ export default function Settings() {
   function updatePref(key, value) {
     if (!user || !user.id) return;
     setSaving(true);
+    setStatus(null);
     const payload = { [key]: value };
     axios.patch(baseURL + "/api/profile", payload).then(function(r) {
       setUser({ ...user, ...r.data }, token);
+      setStatus({ type: "success", message: "Settings saved." });
       setSaving(false);
-    }).catch(function() { setSaving(false); });
+    }).catch(function(err) {
+      setStatus({ type: "error", message: err.response?.data?.error || "Could not save settings." });
+      setSaving(false);
+    });
   }
 
   function handleLargeText(v) {
@@ -65,11 +71,15 @@ export default function Settings() {
     e.preventDefault();
     if (!user?.id || profileSaving) return;
     setProfileSaving(true);
+    setStatus(null);
     axios.patch(baseURL + "/api/profile", profile)
       .then(function(r) {
         setUser({ ...user, ...r.data }, token);
+        setStatus({ type: "success", message: "Profile saved." });
       })
-      .catch(function() {})
+      .catch(function(err) {
+        setStatus({ type: "error", message: err.response?.data?.error || "Could not save profile." });
+      })
       .finally(function() { setProfileSaving(false); });
   }
 
@@ -79,6 +89,15 @@ export default function Settings() {
         <h1 className="settings__title">{t("settings.title")}</h1>
         <p className="settings__subtitle">{t("settings.profile")}</p>
       </motion.header>
+
+      {status && (
+        <div
+          className={`settings__status settings__status--${status.type}`}
+          role={status.type === "error" ? "alert" : "status"}
+        >
+          {status.message}
+        </div>
+      )}
 
       <motion.div className="settings__sections" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }}>
         <motion.section className="settings-section" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
