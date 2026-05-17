@@ -453,6 +453,7 @@ export default function ConnectionsGraph({
         <div
           className={
             "connections__sheet" +
+            " connections__sheet--overlay" +
             (sheetOpen ? " connections__sheet--open" : "")
           }
         >
