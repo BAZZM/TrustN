@@ -15,6 +15,9 @@ export const INNER_RING_RADIUS = 118;
 export const SECONDARY_RING_RADIUS = 174;
 export const SECONDARY_RING_RADIUS_FOCUSED = 210;
 export const FOCUS_FAN_DEGREES = 110;
+export const HELIX_R_MIN = 56;
+export const HELIX_DELTA_R = 10;
+export const HELIX_ANGLE_STEP_DEG = 52;
 export const MAX_VISIBLE_INNER = 8;
 export const MAX_VISIBLE_SECONDARY = 8;
 /** Extra radius beyond node core for touch / accessibility hit target (user units, matches SVG viewBox scale). */
@@ -142,7 +145,7 @@ export function pickFocusPresentationAngle(nodes, focusUserId) {
   return best.angle;
 }
 
-export function getInnerRingLayout(nodes, focusUserId) {
+export function getInnerRingLayout(nodes, focusUserId, options = {}) {
   const total = nodes.length;
 
   if (total === 0) {
@@ -155,6 +158,44 @@ export function getInnerRingLayout(nodes, focusUserId) {
   const presentationAngle =
     focusIndex >= 0 ? pickFocusPresentationAngle(nodes, focusUserId) : -90;
   const rotation = focusIndex >= 0 ? presentationAngle - baseAngles[focusIndex] : 0;
+
+  if (focusIndex >= 0 && options.layoutMode === "helix_focus") {
+    const helixAxis = presentationAngle + 180;
+    let turnIndex = 0;
+    return nodes.map((node) => {
+      const isFocused = node.id === focusUserId;
+      if (isFocused) {
+        const point = polarToCartesian(GRAPH_CENTER, GRAPH_CENTER, INNER_RING_RADIUS, presentationAngle);
+        return {
+          ...node,
+          angle: presentationAngle,
+          x: point.x,
+          y: point.y,
+          isFocused: true,
+          opacity: 1,
+          scale: 1.18,
+          radius: 24,
+          turnIndex: -1,
+        };
+      }
+      const k = turnIndex;
+      turnIndex += 1;
+      const angle = helixAxis + k * HELIX_ANGLE_STEP_DEG;
+      const r = HELIX_R_MIN + k * HELIX_DELTA_R;
+      const point = polarToCartesian(GRAPH_CENTER, GRAPH_CENTER, r, angle);
+      return {
+        ...node,
+        angle,
+        x: point.x,
+        y: point.y,
+        isFocused: false,
+        opacity: 0.22,
+        scale: 0.7,
+        radius: 14,
+        turnIndex: k,
+      };
+    });
+  }
 
   return nodes.map((node, index) => {
     const angle = baseAngles[index] + rotation;
