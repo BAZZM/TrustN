@@ -12,28 +12,23 @@ import {
   sortConnectionsByPriority,
 } from "../components/connections/graphLayout";
 import UnifiedSecondarySearchBar from "../components/connections/UnifiedSecondarySearchBar";
+import AskNetworkPanel from "../components/connections/AskNetworkPanel";
 import "./Connections.css";
 
-/** True iff unified-search row lists focused inner in via_inner_peer_ids (discovery path); matches app_can_intermediate. */
+/** True iff the focused inner peer is one of the secondary's `via` introducers; matches app_can_intermediate. */
 function secondaryIntroEligibleViaFocusedInner(graphNode, focusedInnerRawId) {
-  if (!graphNode?.raw || focusedInnerRawId == null) return false;
+  if (!graphNode || focusedInnerRawId == null) return false;
   const inner = Number(focusedInnerRawId);
   if (!Number.isFinite(inner)) return false;
-  const vias = graphNode.raw.via_inner_peer_ids;
-  if (!Array.isArray(vias) || vias.length === 0) return false;
-  return vias.some((id) => Number(id) === inner);
+  return (graphNode.via || []).some((id) => Number(id) === inner);
 }
 
 /** Higher score = show earlier on the branch arc when an inner peer is focused (discovery rows beat orphan edges). */
 function secondaryBranchArcPriority(norm, focusedRawId) {
   const inner = Number(focusedRawId);
-  const raw = norm?.raw;
-  const vias = raw?.via_inner_peer_ids;
-  const viaHere =
-    Number.isFinite(inner) && Array.isArray(vias) && vias.some((id) => Number(id) === inner);
-  const edge = Array.isArray(raw?.sources) && raw.sources.includes("edge");
+  const viaHere = Number.isFinite(inner) && (norm?.via || []).some((id) => Number(id) === inner);
   if (viaHere) return 2;
-  if (edge) return 1;
+  if (norm?.direct) return 1;
   return 0;
 }
 
@@ -41,18 +36,6 @@ export default function Connections() {
   const location = useLocation();
   const { user, baseURL } = useApp();
   const t = useTranslations(user?.locale ? user.locale : "en");
-  const [narrowViewport, setNarrowViewport] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : true
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
-    const apply = () => setNarrowViewport(media.matches);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, []);
-
   const [connections, setConnections] = useState([]);
   const [requestInbox, setRequestInbox] = useState([]);
   const [requestSent, setRequestSent] = useState([]);
@@ -69,6 +52,9 @@ export default function Connections() {
   const [introRequestSending, setIntroRequestSending] = useState(false);
   const [introRequestError, setIntroRequestError] = useState(null);
   const discoveryRef = useRef(null);
+  // "Ask your network" picks a person who is only loaded once their introducer's branch opens.
+  const pendingAskPickRef = useRef(null);
+  const [askPinnedId, setAskPinnedId] = useState(null);
 
   const loadConnectionsPage = useCallback(() => {
     if (!user?.id) {
@@ -79,11 +65,12 @@ export default function Connections() {
     setLoadError(false);
 
     return Promise.all([
-      axios.get(baseURL + "/api/connections"),
+      // Inner ring only: secondaries load per focused branch below.
+      axios.get(baseURL + "/api/connections/graph?secondary=0"),
       axios.get(baseURL + "/api/connection-requests?scope=all"),
     ])
       .then(([connRes, reqRes]) => {
-        setConnections(connRes.data.connections || []);
+        setConnections(connRes.data.inner || []);
         setRequestInbox(reqRes.data.inbox || []);
         setRequestSent(reqRes.data.sent || []);
       })
@@ -105,7 +92,7 @@ export default function Connections() {
   const normalizedConnections = useMemo(
     () =>
       (connections || [])
-        .map((item) => normalizeGraphNode(item, item?.circle_type))
+        .map((item) => normalizeGraphNode(item, "inner"))
         .filter(Boolean),
     [connections]
   );
@@ -158,15 +145,7 @@ export default function Connections() {
     }
 
     const mapped = (unifiedSecondaryRows || [])
-      .map((item) =>
-        normalizeGraphNode(
-          {
-            ...item,
-            peer_introduced: Array.isArray(item.sources) ? item.sources.includes("edge") : false,
-          },
-          "secondary"
-        )
-      )
+      .map((item) => normalizeGraphNode(item, "secondary"))
       .filter(Boolean);
 
     const fid = focusedConnection?.rawId;
@@ -175,11 +154,15 @@ export default function Connections() {
     }
 
     return [...mapped].sort((a, b) => {
+      if (askPinnedId) {
+        if (a.id === askPinnedId && b.id !== askPinnedId) return -1;
+        if (b.id === askPinnedId && a.id !== askPinnedId) return 1;
+      }
       const byPri = secondaryBranchArcPriority(b, fid) - secondaryBranchArcPriority(a, fid);
       if (byPri !== 0) return byPri;
       return String(a.name || "").localeCompare(String(b.name || ""));
     });
-  }, [focusUserId, focusedConnection?.rawId, unifiedSecondaryRows]);
+  }, [askPinnedId, focusUserId, focusedConnection?.rawId, unifiedSecondaryRows]);
 
   const pickedSecondary = useMemo(
     () => secondaryConnections.find((s) => s.id === pickedSecondaryId) || null,
@@ -244,18 +227,17 @@ export default function Connections() {
 
     const params = new URLSearchParams({
       limit: "200",
-      focused_inner_peer_id: String(focusInner),
-      branch_only: "1",
+      focus: String(focusInner),
     });
     if (debouncedSecondaryQuery) {
       params.set("q", debouncedSecondaryQuery);
     }
 
     axios
-      .get(`${baseURL}/api/connections/secondary-search?${params.toString()}`)
+      .get(`${baseURL}/api/connections/graph?${params.toString()}`)
       .then((res) => {
         if (!cancelled) {
-          setUnifiedSecondaryRows(res.data?.results || []);
+          setUnifiedSecondaryRows(res.data?.secondary || []);
         }
       })
       .catch(() => {
@@ -275,6 +257,8 @@ export default function Connections() {
   }, [baseURL, debouncedSecondaryQuery, focusUserId, focusedConnection?.rawId]);
 
   const handleFocusConnection = useCallback((innerNode) => {
+    setAskPinnedId(null);
+    pendingAskPickRef.current = null;
     setPickedSecondaryId(null);
     setIntroRequestError(null);
     setSecondarySearchInput("");
@@ -289,6 +273,8 @@ export default function Connections() {
   }, []);
 
   const handleResetFocus = useCallback(() => {
+    setAskPinnedId(null);
+    pendingAskPickRef.current = null;
     setFocusUserId(null);
     setPickedSecondaryId(null);
     setIntroRequestError(null);
@@ -296,6 +282,31 @@ export default function Connections() {
     setDebouncedSecondaryQuery("");
     setUnifiedSecondaryRows([]);
   }, []);
+
+  /** Jump to an "ask" result: open the introducer's branch and select the person once it loads. */
+  const handleAskPick = useCallback(
+    (result) => {
+      if (result.kind === "inner") {
+        handleFocusConnection({ id: String(result.id) });
+        return;
+      }
+      if (result.path?.kind === "via_inner" && result.path.via?.id != null) {
+        handleFocusConnection({ id: String(result.path.via.id) });
+        pendingAskPickRef.current = String(result.id);
+        setAskPinnedId(String(result.id));
+      }
+    },
+    [handleFocusConnection]
+  );
+
+  useEffect(() => {
+    const pending = pendingAskPickRef.current;
+    if (!pending) return;
+    if (secondaryConnections.some((s) => s.id === pending)) {
+      pendingAskPickRef.current = null;
+      setPickedSecondaryId(pending);
+    }
+  }, [secondaryConnections]);
 
   const handleSecondarySelect = useCallback((node) => {
     if (!node?.id) return;
@@ -391,9 +402,9 @@ export default function Connections() {
 
   const isSecondaryLoading = Boolean(focusUserId && secondaryUnifiedLoading);
   const showTrustGraph = !loading && innerConnections.length > 0;
-  const immersiveGraph = showTrustGraph && narrowViewport;
-  const needsDockClearance =
-    location.pathname === "/connections" && narrowViewport && !immersiveGraph;
+  // Full-bleed at every width; wide screens centre the graph column in CSS (see Connections.css).
+  const immersiveGraph = showTrustGraph;
+  const needsDockClearance = location.pathname === "/connections" && !immersiveGraph;
 
   const pageHeader = (
     <motion.header
@@ -556,6 +567,16 @@ export default function Connections() {
     focusExtras,
     focusSearchSlot,
     secondarySearchActive: Boolean(focusUserId && debouncedSecondaryQuery),
+    renderAsk: ({ close }) => (
+      <AskNetworkPanel
+        baseURL={baseURL}
+        t={t}
+        onPick={(result) => {
+          handleAskPick(result);
+          close();
+        }}
+      />
+    ),
     t,
   };
 

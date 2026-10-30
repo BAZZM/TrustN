@@ -10,6 +10,7 @@ import {
   getCurrentUserFocusHubLayout,
   getInnerRingLayout,
   getSecondaryRingLayout,
+  normalizeGraphNode,
   pickFocusPresentationAngle,
 } from "./graphLayout";
 
@@ -210,5 +211,57 @@ describe("getInnerRingLayout with layoutMode focus_hub", () => {
     const r = Math.hypot(you.x - GRAPH_CENTER, you.y - GRAPH_CENTER);
     expect(r).toBeCloseTo(INNER_RING_RADIUS, 5);
     expect(r).toBeGreaterThan(HELIX_R_MIN);
+  });
+});
+
+describe("normalizeGraphNode", () => {
+  it("reads the slim /graph inner shape", () => {
+    const node = normalizeGraphNode(
+      { id: 9, name: "Alice", job_role: "Engineer", industry: "Tech", strength: 2, introduced: true },
+      "inner"
+    );
+    expect(node).toMatchObject({
+      id: "9",
+      rawId: 9,
+      name: "Alice",
+      jobRole: "Engineer",
+      industry: "Tech",
+      strength: 2,
+      circleType: "inner",
+      peerIntroduced: true,
+    });
+  });
+
+  it("reads the slim /graph secondary shape without overloading peerIntroduced", () => {
+    const node = normalizeGraphNode(
+      { id: 35, name: "Adam", direct: true, via: [14, 15, 16], primary_via: 15 },
+      "secondary"
+    );
+    expect(node).toMatchObject({ id: "35", direct: true, via: [14, 15, 16], primaryVia: 15 });
+    // A direct edge is not an introduction: peerIntroduced stays false.
+    expect(node.peerIntroduced).toBe(false);
+  });
+
+  it("still reads the legacy secondary-search shape", () => {
+    const node = normalizeGraphNode(
+      { peer_id: 7, peer_name: "Legacy", sources: ["edge", "discovery"], via_inner_peer_ids: [3, 4] },
+      "secondary"
+    );
+    expect(node).toMatchObject({ id: "7", direct: true, via: [3, 4], primaryVia: null });
+  });
+
+  it("defaults direct to false and via to an empty list", () => {
+    const node = normalizeGraphNode({ id: 1, name: "Plain" }, "secondary");
+    expect(node.direct).toBe(false);
+    expect(node.via).toEqual([]);
+    expect(node.primaryVia).toBeNull();
+  });
+
+  it("keeps the legacy /connections inner shape working", () => {
+    const node = normalizeGraphNode(
+      { id: 374, peer_id: 50, peer_name: "User 40", circle_type: "inner", peer_introduced: true, strength: 1 },
+      "secondary"
+    );
+    expect(node).toMatchObject({ id: "50", circleType: "inner", peerIntroduced: true });
   });
 });

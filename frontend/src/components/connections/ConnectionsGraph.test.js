@@ -29,6 +29,10 @@ const translations = {
   "connections.expandDetails": "Details",
   "connections.branchSearchFabAria": "Search people in this branch",
   "connections.branchSearchFabLabel": "Search",
+  "connections.askFabAria": "Ask your network a question",
+  "connections.askFabLabel": "Ask",
+  "connections.askTitle": "Ask your network",
+  "connections.askCloseAria": "Close ask your network",
 };
 
 function t(key) {
@@ -55,6 +59,8 @@ describe("ConnectionsGraph", () => {
   afterEach(() => {
     document.body.removeChild(container);
     container = null;
+    window.localStorage.clear();
+    window.history.pushState({}, "", "/");
   });
 
   it("renders the immersive details sheet as an overlay so it does not reflow the graph", () => {
@@ -239,6 +245,192 @@ describe("ConnectionsGraph", () => {
     ).toBe(1);
   });
 
+  describe("free layout", () => {
+    const flushFrames = (count = 3) =>
+      act(async () => {
+        for (let i = 0; i < count; i += 1) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        }
+      });
+
+    function renderGraph() {
+      const root = createRoot(container);
+      act(() => {
+        root.render(
+          <ConnectionsGraph
+            currentUserName="Alice"
+            innerConnections={[
+              { id: "1", name: "Diana Davis", strength: 5 },
+              { id: "2", name: "Bob Brown", strength: 4 },
+              { id: "3", name: "Carol Chen", strength: 3 },
+            ]}
+            overflowInnerConnections={[]}
+            focusUserId={null}
+            focusedConnection={null}
+            secondaryConnections={[]}
+            secondaryLoading={false}
+            onFocusConnection={jest.fn()}
+            onResetFocus={jest.fn()}
+            statsSummary={<span>stats</span>}
+            t={t}
+            immersive
+          />
+        );
+      });
+      return root;
+    }
+
+    const toggle = () => container.querySelector(".connections__layout-toggle");
+    const transforms = () =>
+      [...container.querySelectorAll(".connections__inner-node[tabindex]")].map((el) => el.style.transform);
+
+    it("is off by default", () => {
+      renderGraph();
+      expect(toggle().getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("toggles on and off and remembers the choice", () => {
+      renderGraph();
+      act(() => toggle().click());
+      expect(toggle().getAttribute("aria-pressed")).toBe("true");
+      expect(window.localStorage.getItem("intro_graph_layout")).toBe("free");
+      act(() => toggle().click());
+      expect(toggle().getAttribute("aria-pressed")).toBe("false");
+      expect(window.localStorage.getItem("intro_graph_layout")).toBe("fixed");
+    });
+
+    it("starts on from a stored choice", () => {
+      window.localStorage.setItem("intro_graph_layout", "free");
+      renderGraph();
+      expect(toggle().getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("?layout=free turns it on and is remembered; ?layout=fixed turns it off", () => {
+      window.history.pushState({}, "", "/?layout=free");
+      renderGraph();
+      expect(toggle().getAttribute("aria-pressed")).toBe("true");
+      expect(window.localStorage.getItem("intro_graph_layout")).toBe("free");
+
+      document.body.removeChild(container);
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      window.history.pushState({}, "", "/?layout=fixed");
+      renderGraph();
+      expect(toggle().getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("leaves a layout with no overlaps exactly on its rest positions", async () => {
+      const root = renderGraph();
+      await flushFrames(4);
+      const fixed = transforms();
+      expect(fixed.length).toBe(3);
+      fixed.forEach((value) => expect(value).toMatch(/translate/));
+      act(() => root.unmount());
+      document.body.removeChild(container);
+      container = document.createElement("div");
+      document.body.appendChild(container);
+
+      window.localStorage.setItem("intro_graph_layout", "free");
+      renderGraph();
+      await flushFrames(12);
+      transforms().forEach((value, index) => {
+        const nums = (str) => (str.match(/-?\d+(\.\d+)?/g) || []).map(Number);
+        const live = nums(value);
+        const rest = nums(fixed[index]);
+        expect(live.length).toBe(rest.length);
+        live.forEach((n, i) => expect(Math.abs(n - rest[i])).toBeLessThan(0.6));
+      });
+    });
+  });
+
+  describe("keyboard navigation", () => {
+    const press = (target, key) =>
+      act(() => {
+        target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      });
+
+    function renderGraph(overrides = {}) {
+      const onResetFocus = jest.fn();
+      const root = createRoot(container);
+      act(() => {
+        root.render(
+          <ConnectionsGraph
+            currentUserName="Alice"
+            innerConnections={[
+              { id: "1", name: "Diana Davis", strength: 5 },
+              { id: "2", name: "Bob Brown", strength: 4 },
+              { id: "3", name: "Carol Chen", strength: 3 },
+            ]}
+            overflowInnerConnections={[]}
+            focusUserId={null}
+            focusedConnection={null}
+            secondaryConnections={[]}
+            secondaryLoading={false}
+            onFocusConnection={jest.fn()}
+            onResetFocus={onResetFocus}
+            statsSummary={<span>stats</span>}
+            t={t}
+            immersive
+            {...overrides}
+          />
+        );
+      });
+      return { onResetFocus };
+    }
+
+    const innerNodes = () => [...container.querySelectorAll(".connections__inner-node[tabindex]")];
+
+    it("moves focus between inner nodes with the arrow keys and wraps", () => {
+      renderGraph();
+      const nodes = innerNodes();
+      expect(nodes.length).toBe(3);
+
+      nodes[0].focus();
+      press(nodes[0], "ArrowRight");
+      expect(document.activeElement).toBe(nodes[1]);
+      press(nodes[1], "ArrowDown");
+      expect(document.activeElement).toBe(nodes[2]);
+      press(nodes[2], "ArrowRight");
+      expect(document.activeElement).toBe(nodes[0]);
+      press(nodes[0], "ArrowLeft");
+      expect(document.activeElement).toBe(nodes[2]);
+      press(nodes[2], "ArrowUp");
+      expect(document.activeElement).toBe(nodes[1]);
+    });
+
+    it("Escape clears the focused branch when no overlay is open", () => {
+      const { onResetFocus } = renderGraph({
+        focusUserId: "1",
+        focusedConnection: { id: "1", name: "Diana Davis" },
+      });
+      press(document, "Escape");
+      expect(onResetFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("Escape does nothing when there is no focused branch", () => {
+      const { onResetFocus } = renderGraph();
+      press(document, "Escape");
+      expect(onResetFocus).not.toHaveBeenCalled();
+    });
+
+    it("Escape closes an open overlay first and leaves the branch focused", async () => {
+      const { onResetFocus } = renderGraph({
+        focusUserId: "1",
+        focusedConnection: { id: "1", name: "Diana Davis" },
+      });
+      const details = [...container.querySelectorAll(".connections__fab")].find(
+        (el) => el.getAttribute("aria-label") === "Open details and requests"
+      );
+      act(() => details.click());
+      press(document, "Escape");
+      expect(container.querySelector(".connections__sheet").classList.contains("connections__sheet--closed")).toBe(
+        true
+      );
+      expect(onResetFocus).not.toHaveBeenCalled();
+    });
+  });
+
   describe("modal overlays", () => {
     const flushFrame = () =>
       act(async () => {
@@ -344,6 +536,51 @@ describe("ConnectionsGraph", () => {
         true
       );
       expect(onResetFocus).not.toHaveBeenCalled();
+    });
+
+    it("has no Ask button unless the page supplies renderAsk", () => {
+      renderGraph();
+      expect(fab("Ask your network a question")).toBeUndefined();
+    });
+
+    it("opens ask-your-network as a modal, focuses its input, and returns focus to the Ask FAB on Escape", async () => {
+      const close = jest.fn();
+      renderGraph({
+        renderAsk: (api) => {
+          close.mockImplementation(api.close);
+          return <input id="connections-ask-input" />;
+        },
+      });
+      const askFab = fab("Ask your network a question");
+      expect(askFab).toBeTruthy();
+
+      act(() => askFab.click());
+      await flushFrame();
+
+      const dialog = container.querySelector(".connections__ask-modal");
+      expect(dialog.getAttribute("role")).toBe("dialog");
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      expect(document.activeElement.id).toBe("connections-ask-input");
+      expect(container.querySelector(".connections__graph-stage--immersive").hasAttribute("inert")).toBe(true);
+      expect(container.querySelector(".connections__sheet").classList.contains("connections__sheet--closed")).toBe(true);
+
+      pressEscape();
+      expect(container.querySelector(".connections__ask-modal")).toBeNull();
+      expect(document.activeElement).toBe(askFab);
+    });
+
+    it("lets the ask panel close the dialog through the close callback", async () => {
+      renderGraph({
+        renderAsk: ({ close }) => (
+          <button type="button" id="ask-done" onClick={close}>
+            done
+          </button>
+        ),
+      });
+      act(() => fab("Ask your network a question").click());
+      await flushFrame();
+      act(() => container.querySelector("#ask-done").click());
+      expect(container.querySelector(".connections__ask-modal")).toBeNull();
     });
 
     it("opens branch search with focus in the field and returns focus to the Search FAB on Escape", async () => {

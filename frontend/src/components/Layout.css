@@ -154,6 +154,16 @@
   -webkit-backdrop-filter: blur(var(--dock-blur));
 }
 
+/* Wide screens: keep the floating nav a compact centred bar instead of spanning the viewport */
+@media (min-width: 768px) {
+  .layout-nav--floating {
+    left: 50%;
+    right: auto;
+    width: min(560px, calc(100% - 24px));
+    transform: translateX(-50%);
+  }
+}
+
 .layout-nav--floating .layout-nav__list {
   padding: var(--space-xs) var(--space-sm);
   border-radius: inherit;

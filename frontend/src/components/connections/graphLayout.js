@@ -41,9 +41,21 @@ export function normalizeGraphNode(item, fallbackCircleType = "secondary") {
   const strengthValue = Number(item?.strength);
   const strength = Number.isFinite(strengthValue) ? strengthValue : 0;
   const circleType = item?.circle_type === "inner" ? "inner" : fallbackCircleType;
+  // Inner peers only: the inner link came from an introduction request. (Not "has a direct edge".)
   const peerIntroduced = Boolean(
-    item?.peer_introduced ?? item?.introduced_via_request_id ?? item?.raw?.peer_introduced
+    item?.peer_introduced ??
+      item?.introduced ??
+      item?.introduced_via_request_id ??
+      item?.raw?.peer_introduced
   );
+  // Secondaries: `direct` = viewer has a stored secondary edge; `via` = inner peers who can introduce.
+  // Accepts the slim /graph shape and the legacy secondary-search shape (sources / via_inner_peer_ids).
+  const rawVia = item?.via ?? item?.via_inner_peer_ids;
+  const via = Array.isArray(rawVia) ? rawVia.filter((v) => v != null) : [];
+  const direct = Boolean(
+    item?.direct ?? (Array.isArray(item?.sources) ? item.sources.includes("edge") : false)
+  );
+  const primaryVia = item?.primary_via ?? null;
 
   return {
     id: String(id),
@@ -63,6 +75,9 @@ export function normalizeGraphNode(item, fallbackCircleType = "secondary") {
     strength,
     circleType,
     peerIntroduced,
+    direct,
+    via,
+    primaryVia,
     createdAt: item?.created_at ?? null,
     createdAtMs: toTimestamp(item?.created_at),
     raw: item,

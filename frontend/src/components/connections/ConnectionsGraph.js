@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion, useReducedMotion } from "framer-motion";
 import { usePinchPanZoom } from "../../hooks/usePinchPanZoom";
 import useModalOverlay from "../../hooks/useModalOverlay";
+import useForceLayout from "../../hooks/useForceLayout";
 import {
   GRAPH_CENTER,
   GRAPH_VIEWBOX,
@@ -28,6 +29,51 @@ function graphClickWasOnInteractiveSurface(nativeEvent) {
   return t instanceof Element && Boolean(t.closest(GRAPH_INTERACTIVE_HIT));
 }
 
+const LAYOUT_STORAGE_KEY = "intro_graph_layout";
+
+/** `?layout=free|fixed` wins and is remembered; otherwise the stored choice; default is the fixed layout. */
+function readFreeLayoutPreference() {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("layout");
+    if (fromUrl === "free" || fromUrl === "fixed") {
+      window.localStorage.setItem(LAYOUT_STORAGE_KEY, fromUrl);
+      return fromUrl === "free";
+    }
+    return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === "free";
+  } catch (_) {
+    return false;
+  }
+}
+
+function writeFreeLayoutPreference(free) {
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, free ? "free" : "fixed");
+  } catch (_) {
+    /* storage unavailable: the choice just won't persist */
+  }
+}
+
+/** The node moved to its live physics position when there is one. */
+function withLivePosition(positions, key, node) {
+  const live = positions && positions.get(key);
+  return live ? { ...node, x: live.x, y: live.y } : node;
+}
+
+/** SVG user-space point under a pointer event (accounts for CSS transforms such as pinch-zoom). */
+function pointerToViewBox(event) {
+  const svg = event.currentTarget.ownerSVGElement;
+  const matrix = svg && svg.getScreenCTM && svg.getScreenCTM();
+  if (!matrix) return null;
+  const point = svg.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+  const local = point.matrixTransform(matrix.inverse());
+  return { x: local.x, y: local.y };
+}
+
+/** Arrow keys move focus between sibling nodes: right/down = next, left/up = previous. */
+const ARROW_STEP = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+
 function Node({
   node,
   label,
@@ -41,6 +87,10 @@ function Node({
   hitPadding = 10,
   tapSlop = 0,
   hideLabel = false,
+  onArrow,
+  onDrag,
+  onDragEnd,
+  instant = false,
 }) {
   // className may carry modifiers ("base base--acquired"); element suffixes hang off the base token only.
   const baseClass = className.split(" ")[0];
@@ -52,6 +102,7 @@ function Node({
     .filter(Boolean)
     .join(" ");
   const downRef = useRef(null);
+  const draggingRef = useRef(false);
   /** After pointer-up activation (desktop), ignore the synthetic click so secondary pick doesn’t toggle twice. */
   const suppressClickRef = useRef(false);
 
@@ -60,7 +111,36 @@ function Node({
     downRef.current = { x: e.clientX, y: e.clientY };
   }
 
+  function pointerMove(e) {
+    if (!onDrag || !downRef.current) return;
+    const moved = Math.hypot(e.clientX - downRef.current.x, e.clientY - downRef.current.y);
+    if (!draggingRef.current && moved > tapSlop) {
+      draggingRef.current = true;
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (_) {
+        /* pointer already released: the drag still follows move events on the node */
+      }
+    }
+    if (draggingRef.current) {
+      const point = pointerToViewBox(e);
+      if (point) onDrag(node, point);
+    }
+  }
+
+  function endDrag() {
+    if (!draggingRef.current) return false;
+    draggingRef.current = false;
+    downRef.current = null;
+    if (onDragEnd) onDragEnd(node);
+    return true;
+  }
+
   function pointerUp(e) {
+    if (endDrag()) {
+      e.stopPropagation();
+      return;
+    }
     if (disabled) {
       downRef.current = null;
       e.stopPropagation();
@@ -86,23 +166,36 @@ function Node({
     }
   }
 
+  const target = {
+    x: node.x,
+    y: node.y,
+    opacity: searchHighlight ? Math.min(1, (node.opacity ?? 1) * 1.08) : node.opacity ?? 1,
+    scale: searchHighlight ? (node.scale ?? 1) * 1.04 : node.scale ?? 1,
+  };
+  // `instant`: another system (the physics step) owns the position every frame, so it is applied as
+  // plain style instead of being animated. (A zero-duration animation from `initial={false}` is
+  // never rendered by framer-motion, which left nodes without any transform.)
+  const motionProps = instant
+    ? { style: target }
+    : { initial: false, animate: target, transition: motionTransition };
+
   return (
     <motion.g
       className={rootClass}
-      initial={false}
-      animate={{
-        x: node.x,
-        y: node.y,
-        opacity: searchHighlight ? Math.min(1, (node.opacity ?? 1) * 1.08) : node.opacity ?? 1,
-        scale: searchHighlight ? (node.scale ?? 1) * 1.04 : node.scale ?? 1,
-      }}
-      transition={motionTransition}
+      {...motionProps}
       tabIndex={disabled ? -1 : 0}
       role={disabled ? undefined : "button"}
       aria-label={disabled ? undefined : label}
       onPointerDown={disabled ? undefined : pointerDown}
       onPointerUp={disabled ? undefined : pointerUp}
-      onPointerCancel={tapSlop ? () => { downRef.current = null; } : undefined}
+      onPointerMove={onDrag ? pointerMove : undefined}
+      onPointerCancel={
+        tapSlop
+          ? () => {
+              if (!endDrag()) downRef.current = null;
+            }
+          : undefined
+      }
       onClick={(event) => {
         event.stopPropagation();
         if (tapSlop > 0) return;
@@ -113,6 +206,12 @@ function Node({
       }}
       onKeyDown={(event) => {
         if (disabled) return;
+        if (onArrow && ARROW_STEP[event.key]) {
+          event.preventDefault();
+          event.stopPropagation();
+          onArrow(event.currentTarget, ARROW_STEP[event.key]);
+          return;
+        }
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           event.stopPropagation();
@@ -158,18 +257,29 @@ export default function ConnectionsGraph({
   immersiveStatsKey = null,
   requestsSlot = null,
   secondarySearchActive = false,
+  renderAsk = null,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const [narrowViewport, setNarrowViewport] = useState(false);
-  // One modal at a time: null | "sheet" | "search"
+  // One modal at a time: null | "sheet" | "search" | "ask"
   const [overlay, setOverlay] = useState(null);
   const sheetOpen = overlay === "sheet";
   const branchSearchOpen = overlay === "search";
+  const askOpen = overlay === "ask" && Boolean(renderAsk);
   const closeOverlay = useCallback(() => setOverlay(null), []);
   const sheetRef = useRef(null);
   const searchOverlayRef = useRef(null);
+  const askOverlayRef = useRef(null);
   const detailsFabRef = useRef(null);
   const searchFabRef = useRef(null);
+  const askFabRef = useRef(null);
+  const [freeLayout, setFreeLayout] = useState(readFreeLayoutPreference);
+  const toggleFreeLayout = useCallback(() => {
+    setFreeLayout((current) => {
+      writeFreeLayoutPreference(!current);
+      return !current;
+    });
+  }, []);
   const [heroStatGlitch, setHeroStatGlitch] = useState(false);
   const prevImmersiveStatsKeyRef = useRef(null);
 
@@ -200,6 +310,25 @@ export default function ConnectionsGraph({
     if (!focusUserId) setOverlay((current) => (current === "search" ? null : current));
   }, [focusUserId]);
 
+  // Escape with no modal open clears the focused branch (an open modal handles Escape itself first).
+  useEffect(() => {
+    if (!immersive || !focusUserId || overlay) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onResetFocus?.();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [immersive, focusUserId, overlay, onResetFocus]);
+
+  const moveInnerFocus = useCallback((from, delta) => {
+    const svg = from.closest("svg");
+    if (!svg) return;
+    const nodes = Array.from(svg.querySelectorAll(".connections__inner-node[tabindex]"));
+    const index = nodes.indexOf(from);
+    if (index < 0 || nodes.length < 2) return;
+    nodes[(index + delta + nodes.length) % nodes.length].focus();
+  }, []);
+
   useModalOverlay({
     open: sheetOpen,
     onClose: closeOverlay,
@@ -213,6 +342,13 @@ export default function ConnectionsGraph({
     panelRef: searchOverlayRef,
     returnFocusRef: searchFabRef,
     getInitialFocus: () => document.getElementById("connections-unified-secondary-search"),
+  });
+  useModalOverlay({
+    open: askOpen,
+    onClose: closeOverlay,
+    panelRef: askOverlayRef,
+    returnFocusRef: askFabRef,
+    getInitialFocus: () => document.getElementById("connections-ask-input"),
   });
 
   const nodeMotionTransition = prefersReducedMotion
@@ -228,7 +364,7 @@ export default function ConnectionsGraph({
     () => (immersive && focusUserId ? { layoutMode: "focus_hub" } : undefined),
     [immersive, focusUserId]
   );
-  const innerLayout = useMemo(
+  const innerRestLayout = useMemo(
     () => getInnerRingLayout(innerConnections, focusUserId, innerLayoutOptions),
     [innerConnections, focusUserId, innerLayoutOptions]
   );
@@ -239,10 +375,56 @@ export default function ConnectionsGraph({
       innerConnections.some((n) => String(n.id) === String(focusUserId)),
     [immersive, focusUserId, innerConnections]
   );
-  const youHubLayout = useMemo(() => {
+  const youRestLayout = useMemo(() => {
     if (!focusHubActive) return null;
     return getCurrentUserFocusHubLayout(innerConnections, focusUserId);
   }, [focusHubActive, innerConnections, focusUserId]);
+  const focusPresentationAngle = useMemo(
+    () => (focusUserId ? pickFocusPresentationAngle(innerConnections, focusUserId) : null),
+    [innerConnections, focusUserId]
+  );
+  const visibleSecondary = useMemo(
+    () => secondaryConnections.slice(0, MAX_VISIBLE_SECONDARY),
+    [secondaryConnections]
+  );
+  const secondaryRestLayout = useMemo(
+    () => getSecondaryRingLayout(visibleSecondary, focusPresentationAngle),
+    [visibleSecondary, focusPresentationAngle]
+  );
+
+  // Free-form layout: physics moves nodes around the rest layout above; the centre glyph (You, or
+  // the focused peer in hub mode) is a fixed obstacle. Off by default.
+  const freeLayoutOn = immersive && freeLayout;
+  const physicsNodes = useMemo(() => {
+    const list = [{ id: "__hub__", x: GRAPH_CENTER, y: GRAPH_CENTER, radius: 38, fixed: true }];
+    innerRestLayout.forEach((n) => {
+      if (focusHubActive && n.isFocused) return;
+      list.push({ id: `i:${n.id}`, x: n.x, y: n.y, radius: n.radius * (n.scale ?? 1) });
+    });
+    secondaryRestLayout.forEach((n) =>
+      list.push({ id: `s:${n.id}`, x: n.x, y: n.y, radius: n.radius * (n.scale ?? 1) })
+    );
+    if (youRestLayout) list.push({ id: "you", x: youRestLayout.x, y: youRestLayout.y, radius: 18 });
+    return list;
+  }, [innerRestLayout, secondaryRestLayout, youRestLayout, focusHubActive]);
+  const { positions, pin, release } = useForceLayout({
+    enabled: freeLayoutOn,
+    nodes: physicsNodes,
+    reducedMotion: Boolean(prefersReducedMotion),
+  });
+
+  const innerLayout = useMemo(
+    () => innerRestLayout.map((n) => withLivePosition(positions, `i:${n.id}`, n)),
+    [innerRestLayout, positions]
+  );
+  const secondaryLayout = useMemo(
+    () => secondaryRestLayout.map((n) => withLivePosition(positions, `s:${n.id}`, n)),
+    [secondaryRestLayout, positions]
+  );
+  const youHubLayout = useMemo(
+    () => (youRestLayout ? withLivePosition(positions, "you", youRestLayout) : null),
+    [youRestLayout, positions]
+  );
   const youNodeForHub = useMemo(() => {
     if (!youHubLayout) return null;
     return {
@@ -253,15 +435,14 @@ export default function ConnectionsGraph({
       strength: 0,
     };
   }, [youHubLayout, currentUserName, t]);
-  const focusPresentationAngle = useMemo(
-    () => (focusUserId ? pickFocusPresentationAngle(innerConnections, focusUserId) : null),
-    [innerConnections, focusUserId]
-  );
-  const visibleSecondary = secondaryConnections.slice(0, MAX_VISIBLE_SECONDARY);
-  const secondaryLayout = useMemo(
-    () => getSecondaryRingLayout(visibleSecondary, focusPresentationAngle),
-    [visibleSecondary, focusPresentationAngle]
-  );
+
+  const dragHandlers = (key) =>
+    freeLayoutOn
+      ? {
+          onDrag: (_node, point) => pin(key, point.x, point.y),
+          onDragEnd: () => release(key),
+        }
+      : {};
   const hiddenSecondaryCount = Math.max(0, secondaryConnections.length - visibleSecondary.length);
   const focusedLayoutNode = innerLayout.find((item) => item.isFocused) || null;
   const centerHubName = focusHubActive
@@ -385,6 +566,8 @@ export default function ConnectionsGraph({
             selected={Boolean(selectedSecondaryId && selectedSecondaryId === node.id)}
             searchHighlight={secondarySearchHighlight}
             motionTransition={nodeMotionTransition}
+            instant={freeLayoutOn}
+            {...dragHandlers(`s:${node.id}`)}
             hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
             tapSlop={immersive ? tapSlop : 0}
             hideLabel
@@ -444,7 +627,10 @@ export default function ConnectionsGraph({
             }
             labelClassName="connections__inner-label"
             onSelect={onFocusConnection}
+            onArrow={moveInnerFocus}
             motionTransition={nodeMotionTransition}
+            instant={freeLayoutOn}
+            {...dragHandlers(`i:${node.id}`)}
             hitPadding={innerHitPadding}
             tapSlop={tapSlop}
           />
@@ -457,7 +643,10 @@ export default function ConnectionsGraph({
           className="connections__inner-node connections__inner-node--you"
           labelClassName="connections__inner-label"
           onSelect={() => onResetFocus?.()}
+          onArrow={moveInnerFocus}
           motionTransition={nodeMotionTransition}
+          instant={freeLayoutOn}
+          {...dragHandlers("you")}
           hitPadding={innerHitPadding}
           tapSlop={tapSlop}
         />
@@ -579,6 +768,14 @@ export default function ConnectionsGraph({
             >
               <div className="connections__immersive-hero-head">
                 <p className="connections__immersive-hero-line">{heroContextLine}</p>
+                <button
+                  type="button"
+                  className="connections__layout-toggle"
+                  aria-pressed={freeLayout}
+                  onClick={toggleFreeLayout}
+                >
+                  {t("connections.layoutFree")}
+                </button>
                 {!pinchDisabled && scale > 1.06 && (
                   <button
                     type="button"
@@ -611,6 +808,17 @@ export default function ConnectionsGraph({
             "connections__immersive-fab-dock" + (overlay ? " connections__immersive-fab-dock--hidden" : "")
           }
         >
+          {renderAsk ? (
+            <button
+              ref={askFabRef}
+              type="button"
+              className="connections__fab connections__fab--ask"
+              aria-label={t("connections.askFabAria")}
+              onClick={() => setOverlay("ask")}
+            >
+              {t("connections.askFabLabel")}
+            </button>
+          ) : null}
           <button
             ref={searchFabRef}
             type="button"
@@ -630,6 +838,41 @@ export default function ConnectionsGraph({
             {t("connections.expandDetails")}
           </button>
         </div>
+
+        {immersive && askOpen ? (
+          <div ref={askOverlayRef} className="connections__branch-search-overlay" role="presentation">
+            <button
+              type="button"
+              className="connections__branch-search-dismiss"
+              aria-label={t("connections.askCloseAria")}
+              onClick={closeOverlay}
+            />
+            <div
+              className="connections__branch-search-modal connections__ask-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="connections-ask-title"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="connections__branch-search-beam" aria-hidden />
+              <div className="connections__branch-search-head">
+                <span id="connections-ask-title" className="connections__branch-search-title">
+                  {t("connections.askTitle")}
+                </span>
+                <button
+                  type="button"
+                  className="connections__branch-search-close"
+                  aria-label={t("connections.askCloseAria")}
+                  onClick={closeOverlay}
+                >
+                  ×
+                </button>
+              </div>
+              {renderAsk({ close: closeOverlay })}
+            </div>
+          </div>
+        ) : null}
 
         {immersive && branchSearchOpen ? (
           <div ref={searchOverlayRef} className="connections__branch-search-overlay" role="presentation">

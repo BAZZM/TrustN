@@ -1207,6 +1207,151 @@
   }
 }
 
+/* Ask your network (inside the shared branch-search modal chrome) */
+.connections__ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.connections__ask-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.connections__ask-row {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.connections__ask-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--immersive-chrome-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+}
+
+.connections__ask-input:focus-visible,
+.connections__ask-submit:focus-visible,
+.connections__ask-example:focus-visible,
+.connections__ask-result:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.connections__ask-submit,
+.connections__ask-example {
+  padding: var(--space-xs) var(--space-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid var(--immersive-chrome-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.connections__ask-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.connections__ask-examples-label,
+.connections__ask-status {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.connections__ask-error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-danger, #ff8a8a);
+}
+
+.connections__ask-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-height: min(46vh, 360px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.connections__ask-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--immersive-chrome-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.connections__ask-result:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.connections__ask-result-name {
+  font-weight: 600;
+}
+
+.connections__ask-result-meta,
+.connections__ask-result-reason {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.connections__ask-result-path {
+  font-size: 0.78rem;
+  color: var(--color-accent);
+}
+
+/* Free-layout switch in the hero capsule; pressed = nodes are draggable and settle by physics */
+.connections__layout-toggle {
+  flex: 0 0 auto;
+  pointer-events: auto;
+  padding: 2px var(--space-sm);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--immersive-chrome-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.connections__layout-toggle[aria-pressed="true"] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.connections__layout-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .connections__fab {
   padding: var(--space-xs) var(--space-md);
   font-size: 0.7rem;

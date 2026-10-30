@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useApp } from "../context/AppContext";
@@ -16,19 +16,8 @@ const navItems = [
 export default function Layout({ children }) {
   const location = useLocation();
   const { setUser } = useApp();
-  const [narrowViewport, setNarrowViewport] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : true
-  );
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
-    const apply = () => setNarrowViewport(media.matches);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, []);
-
-  const immersiveGraphRoute = location.pathname === "/connections" && narrowViewport;
+  // The full-bleed Connections shell applies at every width; wide screens centre its contents in CSS.
+  const immersiveGraphRoute = location.pathname === "/connections";
 
   return (
     <div className={"app" + (immersiveGraphRoute ? " app--immersive-graph" : "")}>
