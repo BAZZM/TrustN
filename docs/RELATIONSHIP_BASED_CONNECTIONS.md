@@ -267,3 +267,69 @@ psql -d intro -f database/migrations/008_relationship_based_secondary_connection
 4. **Advanced Filters**: Add filters for experience level, location, etc.
 5. **Connection Strength**: Display connection strength indicators
 6. **Mutual Connections**: Show mutual connections between primary user and secondary connections
+
+---
+
+## Graph endpoint: `GET /api/connections/graph`
+
+The Connections page reads one slim, unambiguous payload instead of reconstructing relationship rules from three response shapes. It is **additive**: `/api/connections`, `/secondary-for/:id` and `/secondary-search` are unchanged (Contacts and the radial dial still use them). No SQL migration; it reuses `app_unified_secondary_search`.
+
+```
+GET /api/connections/graph?focus=<innerId>&q=<text>&limit=<1..200>&secondary=0|1
+```
+
+| Param | Meaning |
+|-------|---------|
+| `focus` | An inner peer id. Limits `secondary` to that branch (`branch_only`). An id that is not one of the viewer's inner peers is ignored: `secondary` is empty and `meta.focus` is `null`. |
+| `q` | Full-text filter on secondaries. |
+| `limit` | 1..200, default 100 (secondaries). |
+| `secondary=0` | Skip the secondary lookup and return the inner ring only. |
+
+Response (no phone numbers, no bio text):
+
+```json
+{
+  "viewer_id": 1,
+  "inner":     [{ "id": 9, "name": "Alice", "job_role": "…", "industry": "…", "strength": 2, "introduced": false, "created_at": "…" }],
+  "secondary": [{ "id": 35, "name": "…", "job_role": "…", "industry": "…", "direct": true, "via": [14, 15, 16], "primary_via": 15, "rank": null }],
+  "meta": { "inner_total": 8, "secondary_count": 7, "focus": 10, "q": null }
+}
+```
+
+### Vocabulary
+
+| Field | Meaning |
+|-------|---------|
+| `direct` | The viewer has a stored secondary edge to this person. |
+| `via` | Inner peers who can introduce the viewer (discovery paths). **A person can be introduced only if `via` is non-empty.** An edge-only secondary has `via: []`. |
+| `primary_via` | The single branch used to place the person in a tree: highest inner `strength`, ties by lowest id; `null` when `via` is empty. |
+| `introduced` | Inner only: the inner link was created by an introduction request. |
+
+A person can have both `direct: true` and a non-empty `via`. These two facts are independent; the older `peer_introduced` flag on secondaries (which really meant "has a direct edge") is no longer used by the graph.
+
+Implementation: `backend/routes/connections.js` (route), `backend/lib/graphPayload.js` (shaping), tests in `backend/__tests__/graphEndpoint.test.js` and `graphPayload.test.js`. Frontend: `normalizeGraphNode` exposes `direct`, `via`, `primaryVia` and `peerIntroduced`.
+
+---
+
+## Ask your network: `POST /api/connections/ask`
+
+Natural-language search over the people the viewer can already see (inner peers plus discovered or direct secondaries), with the introduction path for each match.
+
+```
+POST /api/connections/ask   { "question": "who works in healthcare and has led a design team?" }
+```
+
+| Stage | What happens | Where |
+|-------|--------------|-------|
+| Interpret | The question becomes up to 6 terms. **Rules by default**: lower-case, drop question words, map everyday job words (`doctor` → `healthcare`, `developer` → `engineer`). Optional model call only when `ASK_LLM=1` **and** `ANTHROPIC_API_KEY` are set; it sees only the question text, its output is validated to short plain-letter terms, and any failure falls back to the rules. | `backend/lib/askInterpret.js` |
+| Retrieve | Inner peers from the viewer's connections, plus `app_unified_secondary_search` **once per term**, merged (the SQL search ANDs words, so one call per term gives OR semantics). Terms are sent as written; Postgres stems them itself. | `routes/connections.js` |
+| Rank | `score = 4*coverage + fieldQuality + (inner ? 2 : 0) + (has introducer ? 1 : 0) + min(strength,4)*0.25`. `coverage` = matched terms / terms. Field weights: role 1.0, industry 0.8, bio 0.5, name 0.3 (a full-text hit that is not a substring counts 0.5). Ties: score, then name, then id. | `backend/lib/askRank.js` |
+| Path | `direct_inner` (inner peer), `via_inner` (through `primary_via`), or `direct_edge_only` (a direct link with no introducer; shown but not actionable). | `askRank.js` |
+
+Response rows carry `id`, `name`, `job_role`, `industry`, `kind`, `score`, `matched` (field **names** only), `path` and a templated `reason`. **No phone numbers and no bio text.** At most 12 results; 20 questions per minute per user (`ASK_RATE_LIMIT_MAX`).
+
+Authorization is unchanged: everything comes from the viewer's own connections and the existing SECURITY DEFINER search, so a person outside the viewer's network cannot appear.
+
+**Deliberately not used yet:** embeddings / pgvector. The demo scale is served by full-text search; embeddings would replace only the *Retrieve* stage (the model never needs to see people data to rank them).
+
+Frontend: `AskNetworkPanel` inside a third modal overlay ("Ask" button). Choosing an inner result focuses that peer; choosing a secondary opens its introducer's branch and selects the person.
