@@ -1,19 +1,14 @@
 const express = require('express');
 const { pool, withUserContext } = require('../db');
+const { shapeInner, shapeSecondary, pickPrimaryVia } = require('../lib/graphPayload');
+const { interpret, MAX_QUESTION_LENGTH } = require('../lib/askInterpret');
+const { rankCandidates } = require('../lib/askRank');
+const { askRateLimiter } = require('../middleware/rateLimitAsk');
 
 const router = express.Router();
 
-// Get all connections for the authenticated user (uses RLS via withUserContext)
-router.get('/', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const userIdInt = typeof userId === 'string' ? parseInt(userId, 10) : userId;
-    if (isNaN(userIdInt)) {
-      return res.status(400).json({ error: 'Invalid user ID' });
-    }
-    const { rows } = await withUserContext(userIdInt, async (client) => {
-      const result = await client.query(
-        `SELECT 
+/** Viewer's connections joined to the peer's profile (shared by GET / and GET /graph). */
+const VIEWER_CONNECTIONS_SQL = `SELECT 
           c.id, 
           c.strength, 
           c.circle_type, 
@@ -28,7 +23,19 @@ router.get('/', async (req, res) => {
         FROM connections c 
         JOIN users u ON (u.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END) 
         WHERE c.user1_id = $1 OR c.user2_id = $1 
-        ORDER BY c.circle_type DESC, c.strength DESC, c.created_at DESC`,
+        ORDER BY c.circle_type DESC, c.strength DESC, c.created_at DESC`;
+
+// Get all connections for the authenticated user (uses RLS via withUserContext)
+router.get('/', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const userIdInt = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+    if (isNaN(userIdInt)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    const { rows } = await withUserContext(userIdInt, async (client) => {
+      const result = await client.query(
+        VIEWER_CONNECTIONS_SQL,
         [userIdInt]
       );
       return result;
@@ -36,6 +43,175 @@ router.get('/', async (req, res) => {
     res.json({ connections: rows });
   } catch (err) {
     console.error('connections GET error:', err.message, err.stack);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * Slim, unambiguous graph payload for the Connections page (no phone numbers, no bio text).
+ *
+ * Query: focus (inner peer id; limits secondary to that branch), q (FTS), limit (1..200, default 100),
+ *        secondary=0 to skip the secondary lookup (inner ring only).
+ * Rows: see backend/lib/graphPayload.js for the direct / via / primary_via definitions.
+ */
+router.get('/graph', async (req, res) => {
+  try {
+    const viewerIdInt = typeof req.user.id === 'string' ? parseInt(req.user.id, 10) : req.user.id;
+    if (isNaN(viewerIdInt)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const rawQ = req.query.q != null ? String(req.query.q).trim() : '';
+    const qParam = rawQ === '' ? null : rawQ;
+
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = Number.isFinite(rawLimit) ? Math.min(200, Math.max(1, rawLimit)) : 100;
+
+    let focus = null;
+    if (req.query.focus != null && String(req.query.focus).trim() !== '') {
+      focus = parseInt(String(req.query.focus), 10);
+      if (isNaN(focus)) {
+        return res.status(400).json({ error: 'Invalid focus' });
+      }
+    }
+
+    const wantSecondary = String(req.query.secondary ?? '1') !== '0';
+
+    const { connectionRows, secondaryRows } = await withUserContext(viewerIdInt, async (client) => {
+      const conns = await client.query(VIEWER_CONNECTIONS_SQL, [viewerIdInt]);
+      if (!wantSecondary) {
+        return { connectionRows: conns.rows, secondaryRows: [] };
+      }
+      const sec = await client.query(
+        `SELECT res_peer_id, res_peer_name, res_peer_job_role, res_peer_industry,
+                res_source_edge, res_via_inner_peer_ids, res_search_rank
+         FROM app_unified_secondary_search($1, $2, $3, 0, NULL::INTEGER, $4::INTEGER, $5::BOOLEAN)`,
+        [viewerIdInt, qParam, limit, focus, focus != null]
+      );
+      return { connectionRows: conns.rows, secondaryRows: sec.rows };
+    });
+
+    const inner = shapeInner(connectionRows);
+    const innerStrengthById = new Map(inner.map((p) => [p.id, p.strength]));
+    // A focus that is not one of the viewer's inner peers is ignored (and returns no secondaries).
+    const focusIsInner = focus != null && innerStrengthById.has(focus);
+    const secondary = wantSecondary ? shapeSecondary(secondaryRows, innerStrengthById) : [];
+
+    res.json({
+      viewer_id: viewerIdInt,
+      inner,
+      secondary,
+      meta: {
+        inner_total: inner.length,
+        secondary_count: secondary.length,
+        focus: focusIsInner ? focus : null,
+        q: qParam,
+      },
+    });
+  } catch (err) {
+    console.error('connections/graph error:', err.message, err.stack);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * "Ask your network": rank people the viewer can already see against a free-text question and say
+ * how to reach them. Retrieval and authorization stay in SQL (the viewer's own connections and
+ * app_unified_secondary_search); interpretation is rules by default (see lib/askInterpret.js).
+ *
+ * Body: { question: string (1..300 chars) }
+ * Response rows never include phone numbers or bio text; `matched` names fields only.
+ */
+router.post('/ask', askRateLimiter, async (req, res) => {
+  try {
+    const viewerIdInt = typeof req.user.id === 'string' ? parseInt(req.user.id, 10) : req.user.id;
+    if (isNaN(viewerIdInt)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+
+    const question = typeof req.body?.question === 'string' ? req.body.question.trim() : '';
+    if (!question) {
+      return res.status(400).json({ error: 'question is required' });
+    }
+    if (question.length > MAX_QUESTION_LENGTH) {
+      return res.status(400).json({ error: `question must be at most ${MAX_QUESTION_LENGTH} characters` });
+    }
+
+    const { mode, terms } = await interpret(question);
+    if (terms.length === 0) {
+      return res.json({ mode, interpretation: { terms }, results: [], meta: { considered: 0 } });
+    }
+
+    const { connectionRows, secondaryByTerm } = await withUserContext(viewerIdInt, async (client) => {
+      const conns = await client.query(VIEWER_CONNECTIONS_SQL, [viewerIdInt]);
+      // The SQL search ANDs words, so look each term up separately and merge (OR semantics).
+      const byTerm = [];
+      for (const term of terms) {
+        // eslint-disable-next-line no-await-in-loop
+        const found = await client.query(
+          `SELECT res_peer_id, res_peer_name, res_peer_job_role, res_peer_industry, res_peer_experience,
+                  res_source_edge, res_via_inner_peer_ids
+           FROM app_unified_secondary_search($1, $2, 100, 0, NULL::INTEGER, NULL::INTEGER, FALSE)`,
+          [viewerIdInt, term]
+        );
+        byTerm.push({ term, rows: found.rows });
+      }
+      return { connectionRows: conns.rows, secondaryByTerm: byTerm };
+    });
+
+    const innerRows = connectionRows.filter((r) => r.circle_type === 'inner');
+    const innerStrengthById = new Map(innerRows.map((r) => [r.peer_id, Number(r.strength) || 0]));
+    const innerNameById = new Map(innerRows.map((r) => [r.peer_id, r.peer_name]));
+
+    const candidates = innerRows.map((r) => ({
+      id: r.peer_id,
+      name: r.peer_name,
+      job_role: r.peer_job_role,
+      industry: r.peer_industry,
+      experience: r.peer_experience,
+      kind: 'inner',
+      strength: Number(r.strength) || 0,
+      direct: false,
+      via: [],
+      primary_via: null,
+    }));
+
+    const secondaryById = new Map();
+    for (const { term, rows } of secondaryByTerm) {
+      for (const r of rows) {
+        const id = r.res_peer_id;
+        if (id === viewerIdInt || innerStrengthById.has(id)) continue;
+        let entry = secondaryById.get(id);
+        if (!entry) {
+          const via = [...new Set((r.res_via_inner_peer_ids || []).filter((v) => v != null))].sort((a, b) => a - b);
+          entry = {
+            id,
+            name: r.res_peer_name,
+            job_role: r.res_peer_job_role,
+            industry: r.res_peer_industry,
+            experience: r.res_peer_experience,
+            kind: 'secondary',
+            strength: 0,
+            direct: Boolean(r.res_source_edge),
+            via,
+            primary_via: pickPrimaryVia(via, innerStrengthById),
+            ftsTerms: [],
+          };
+          secondaryById.set(id, entry);
+        }
+        entry.ftsTerms.push(term);
+      }
+    }
+    candidates.push(...secondaryById.values());
+
+    res.json({
+      mode,
+      interpretation: { terms },
+      results: rankCandidates(candidates, terms, innerNameById),
+      meta: { considered: candidates.length },
+    });
+  } catch (err) {
+    console.error('connections/ask error:', err.message, err.stack);
     res.status(500).json({ error: 'Server error' });
   }
 });
