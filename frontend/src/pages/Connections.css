@@ -1151,7 +1151,7 @@
   border-width: 1px;
   margin-left: var(--space-xs);
   margin-right: var(--space-xs);
-  transition: max-height 0.32s var(--ease-out-expo), opacity 0.22s ease, visibility 0.22s ease;
+  transition: max-height 0.32s var(--ease-out-expo), opacity 0.22s ease, visibility 0s;
 }
 
 /* Centered pair above nav — in document flow so the graph flexes above them */
@@ -1181,6 +1181,30 @@
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* FABs stay mounted while an overlay is open so focus can return to them; they are also inert then */
+.connections__immersive-fab-dock--hidden {
+  visibility: hidden;
+}
+
+/* Taps behind the open sheet close it; they must not reach the graph and clear the branch */
+.connections__sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgba(4, 6, 12, 0.35);
+}
+
+/* Above the stats dock (4) and scrim (5), below the branch search overlay (8) */
+.connections__sheet--overlay {
+  z-index: 7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connections__sheet--open {
+    transition: none;
+  }
 }
 
 .connections__fab {

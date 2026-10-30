@@ -238,4 +238,130 @@ describe("ConnectionsGraph", () => {
       container.querySelectorAll(".connections__inner-node--acquired .connections__inner-node__hit").length
     ).toBe(1);
   });
+
+  describe("modal overlays", () => {
+    const flushFrame = () =>
+      act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      });
+    const pressEscape = () =>
+      act(() => {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      });
+    const fab = (label) =>
+      [...container.querySelectorAll(".connections__fab")].find((el) => el.getAttribute("aria-label") === label);
+
+    function renderGraph(overrides = {}) {
+      const onResetFocus = jest.fn();
+      const root = createRoot(container);
+      act(() => {
+        root.render(
+          <ConnectionsGraph
+            currentUserName="Alice"
+            innerConnections={[
+              { id: "1", name: "Diana Davis", strength: 5 },
+              { id: "2", name: "Bob Brown", strength: 4 },
+            ]}
+            overflowInnerConnections={[]}
+            focusUserId="1"
+            focusedConnection={{ id: "1", name: "Diana Davis" }}
+            secondaryConnections={[]}
+            secondaryLoading={false}
+            onFocusConnection={jest.fn()}
+            onResetFocus={onResetFocus}
+            statsSummary={<span>stats</span>}
+            focusSearchSlot={<input id="connections-unified-secondary-search" />}
+            t={t}
+            immersive
+            {...overrides}
+          />
+        );
+      });
+      return { onResetFocus };
+    }
+
+    it("opens the sheet as a modal: inert background, focus on the handle, FABs stay mounted", async () => {
+      renderGraph();
+      const details = fab("Open details and requests");
+
+      act(() => details.click());
+      await flushFrame();
+
+      const sheet = container.querySelector(".connections__sheet");
+      expect(sheet.getAttribute("role")).toBe("dialog");
+      expect(sheet.getAttribute("aria-modal")).toBe("true");
+      expect(sheet.getAttribute("aria-hidden")).toBe("false");
+      expect(container.querySelector(".connections__graph-stage--immersive").hasAttribute("inert")).toBe(true);
+      expect(container.querySelector(".connections__immersive-bottom-dock").hasAttribute("inert")).toBe(true);
+      expect(container.querySelector(".connections__immersive-fab-dock").hasAttribute("inert")).toBe(true);
+      expect(document.activeElement.classList.contains("connections__sheet-handle")).toBe(true);
+      expect(container.querySelectorAll(".connections__fab").length).toBe(2);
+      expect(container.contains(details)).toBe(true);
+    });
+
+    it("makes content outside the graph inert too (global nav), but not the scrim, and restores it on close", async () => {
+      const nav = document.createElement("nav");
+      document.body.appendChild(nav);
+      try {
+        renderGraph();
+
+        act(() => fab("Open details and requests").click());
+        await flushFrame();
+        expect(nav.hasAttribute("inert")).toBe(true);
+        expect(container.querySelector(".connections__sheet-scrim").hasAttribute("inert")).toBe(false);
+        expect(container.querySelector(".connections__sheet").hasAttribute("inert")).toBe(false);
+
+        pressEscape();
+        expect(nav.hasAttribute("inert")).toBe(false);
+      } finally {
+        document.body.removeChild(nav);
+      }
+    });
+
+    it("closes on Escape and returns focus to the Details FAB", async () => {
+      renderGraph();
+      const details = fab("Open details and requests");
+
+      act(() => details.click());
+      await flushFrame();
+      pressEscape();
+
+      const sheet = container.querySelector(".connections__sheet");
+      expect(sheet.classList.contains("connections__sheet--closed")).toBe(true);
+      expect(sheet.hasAttribute("role")).toBe(false);
+      expect(container.querySelector(".connections__graph-stage--immersive").hasAttribute("inert")).toBe(false);
+      expect(document.activeElement).toBe(details);
+    });
+
+    it("closes on scrim tap without clearing the focused branch", async () => {
+      const { onResetFocus } = renderGraph();
+
+      act(() => fab("Open details and requests").click());
+      await flushFrame();
+      act(() => container.querySelector(".connections__sheet-scrim").click());
+
+      expect(container.querySelector(".connections__sheet").classList.contains("connections__sheet--closed")).toBe(
+        true
+      );
+      expect(onResetFocus).not.toHaveBeenCalled();
+    });
+
+    it("opens branch search with focus in the field and returns focus to the Search FAB on Escape", async () => {
+      renderGraph();
+      const search = fab("Search people in this branch");
+
+      act(() => search.click());
+      await flushFrame();
+
+      expect(container.querySelector(".connections__branch-search-modal")).toBeTruthy();
+      expect(document.activeElement.id).toBe("connections-unified-secondary-search");
+      expect(container.querySelector(".connections__sheet").classList.contains("connections__sheet--closed")).toBe(
+        true
+      );
+
+      pressEscape();
+      expect(container.querySelector(".connections__branch-search-modal")).toBeNull();
+      expect(document.activeElement).toBe(search);
+    });
+  });
 });

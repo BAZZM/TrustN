@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { usePinchPanZoom } from "../../hooks/usePinchPanZoom";
+import useModalOverlay from "../../hooks/useModalOverlay";
 import {
   GRAPH_CENTER,
   GRAPH_VIEWBOX,
@@ -160,12 +161,19 @@ export default function ConnectionsGraph({
 }) {
   const prefersReducedMotion = useReducedMotion();
   const [narrowViewport, setNarrowViewport] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [branchSearchOpen, setBranchSearchOpen] = useState(false);
+  // One modal at a time: null | "sheet" | "search"
+  const [overlay, setOverlay] = useState(null);
+  const sheetOpen = overlay === "sheet";
+  const branchSearchOpen = overlay === "search";
+  const closeOverlay = useCallback(() => setOverlay(null), []);
+  const sheetRef = useRef(null);
+  const searchOverlayRef = useRef(null);
+  const detailsFabRef = useRef(null);
+  const searchFabRef = useRef(null);
   const [heroStatGlitch, setHeroStatGlitch] = useState(false);
   const prevImmersiveStatsKeyRef = useRef(null);
 
-  const pinchDisabled = !immersive || prefersReducedMotion || branchSearchOpen;
+  const pinchDisabled = !immersive || prefersReducedMotion || Boolean(overlay);
   const { viewportRef, transformStyle, consumeShouldIgnoreTap, resetTransform, scale } = usePinchPanZoom({
     disabled: pinchDisabled,
   });
@@ -189,30 +197,23 @@ export default function ConnectionsGraph({
   }, [immersive, immersiveStatsKey]);
 
   useEffect(() => {
-    if (!focusUserId) setBranchSearchOpen(false);
+    if (!focusUserId) setOverlay((current) => (current === "search" ? null : current));
   }, [focusUserId]);
 
-  useEffect(() => {
-    if (sheetOpen) setBranchSearchOpen(false);
-  }, [sheetOpen]);
-
-  useEffect(() => {
-    if (!branchSearchOpen) return undefined;
-    if (!focusSearchSlot) return undefined;
-    const id = window.setTimeout(() => {
-      document.getElementById("connections-unified-secondary-search")?.focus();
-    }, 60);
-    return () => window.clearTimeout(id);
-  }, [branchSearchOpen, focusSearchSlot]);
-
-  useEffect(() => {
-    if (!branchSearchOpen) return undefined;
-    const onKey = (e) => {
-      if (e.key === "Escape") setBranchSearchOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [branchSearchOpen]);
+  useModalOverlay({
+    open: sheetOpen,
+    onClose: closeOverlay,
+    panelRef: sheetRef,
+    returnFocusRef: detailsFabRef,
+    getInitialFocus: () => sheetRef.current?.querySelector(".connections__sheet-handle"),
+  });
+  useModalOverlay({
+    open: branchSearchOpen,
+    onClose: closeOverlay,
+    panelRef: searchOverlayRef,
+    returnFocusRef: searchFabRef,
+    getInitialFocus: () => document.getElementById("connections-unified-secondary-search"),
+  });
 
   const nodeMotionTransition = prefersReducedMotion
     ? { duration: 0.12, ease: "linear" }
@@ -596,45 +597,47 @@ export default function ConnectionsGraph({
         </div>
 
         {statsSummary ? (
-          <div className="connections__immersive-bottom-dock" aria-label={t("connections.networkSummary")}>
+          <div
+            className="connections__immersive-bottom-dock"
+            aria-label={t("connections.networkSummary")}
+          >
             <div className={dockStatsClass}>{statsSummary}</div>
           </div>
         ) : null}
 
-        {!sheetOpen && !branchSearchOpen ? (
-          <div className="connections__immersive-fab-dock">
-            <button
-              type="button"
-              className="connections__fab connections__fab--branch-search"
-              aria-label={t("connections.branchSearchFabAria")}
-              onClick={() => {
-                setSheetOpen(false);
-                setBranchSearchOpen(true);
-              }}
-            >
-              {t("connections.branchSearchFabLabel")}
-            </button>
-            <button
-              type="button"
-              className="connections__fab"
-              aria-label={t("connections.heroFabAria")}
-              onClick={() => {
-                setBranchSearchOpen(false);
-                setSheetOpen(true);
-              }}
-            >
-              {t("connections.expandDetails")}
-            </button>
-          </div>
-        ) : null}
+        {/* Stays mounted while an overlay is open so focus has a real element to return to. */}
+        <div
+          className={
+            "connections__immersive-fab-dock" + (overlay ? " connections__immersive-fab-dock--hidden" : "")
+          }
+        >
+          <button
+            ref={searchFabRef}
+            type="button"
+            className="connections__fab connections__fab--branch-search"
+            aria-label={t("connections.branchSearchFabAria")}
+            onClick={() => setOverlay("search")}
+          >
+            {t("connections.branchSearchFabLabel")}
+          </button>
+          <button
+            ref={detailsFabRef}
+            type="button"
+            className="connections__fab"
+            aria-label={t("connections.heroFabAria")}
+            onClick={() => setOverlay("sheet")}
+          >
+            {t("connections.expandDetails")}
+          </button>
+        </div>
 
         {immersive && branchSearchOpen ? (
-          <div className="connections__branch-search-overlay" role="presentation">
+          <div ref={searchOverlayRef} className="connections__branch-search-overlay" role="presentation">
             <button
               type="button"
               className="connections__branch-search-dismiss"
               aria-label={t("connections.branchSearchDismissAria")}
-              onClick={() => setBranchSearchOpen(false)}
+              onClick={closeOverlay}
             />
             <div
               className="connections__branch-search-modal"
@@ -653,7 +656,7 @@ export default function ConnectionsGraph({
                   type="button"
                   className="connections__branch-search-close"
                   aria-label={t("connections.branchSearchCloseAria")}
-                  onClick={() => setBranchSearchOpen(false)}
+                  onClick={closeOverlay}
                 >
                   ×
                 </button>
@@ -687,7 +690,7 @@ export default function ConnectionsGraph({
                               className="connections__branch-search-result-btn"
                               onClick={() => {
                                 onSelectSecondary?.(row);
-                                setBranchSearchOpen(false);
+                                closeOverlay();
                                 resetTransform();
                               }}
                             >
@@ -709,12 +712,17 @@ export default function ConnectionsGraph({
             </div>
           </div>
         ) : null}
+        {sheetOpen ? <div className="connections__sheet-scrim" data-modal-keep onClick={closeOverlay} aria-hidden /> : null}
         <div
+          ref={sheetRef}
           className={
             "connections__sheet" +
             " connections__sheet--overlay" +
             (sheetOpen ? " connections__sheet--open" : " connections__sheet--closed")
           }
+          role={sheetOpen ? "dialog" : undefined}
+          aria-modal={sheetOpen ? "true" : undefined}
+          aria-label={sheetOpen ? t("connections.sheetDialogAria") : undefined}
           aria-hidden={!sheetOpen}
         >
           <div className="connections__sheet-static">{focusCard}</div>
@@ -722,7 +730,7 @@ export default function ConnectionsGraph({
             <button
               type="button"
               className="connections__sheet-handle"
-              onClick={() => setSheetOpen(false)}
+              onClick={closeOverlay}
               aria-expanded={sheetOpen}
             >
               <span className="connections__sheet-handle-bar" aria-hidden />

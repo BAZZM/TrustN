@@ -40,6 +40,7 @@ const en = {
     emptyTitle: "No inner-circle connections yet",
     emptyBody:
       "Once you have trusted inner-circle relationships, they will appear here as a radial network instead of a list.",
+    sheetDialogAria: "Connection details and requests",
     loadErrorTitle: "Couldn't load your network",
     loadErrorBody: "Something went wrong reaching the server. Check your connection and try again.",
     retry: "Try again",
