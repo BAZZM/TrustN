@@ -16,9 +16,9 @@
 - Modify: `frontend/src/components/connections/graphLayout.js`
 - Modify: `frontend/src/components/connections/graphLayout.test.js`
 
-- [ ] Add `layoutMode === "focus_hub"` branch: focused node at `(GRAPH_CENTER, GRAPH_CENTER)`; non-focused on helix from hub (same Δr/angle step as `helix_focus`).
-- [ ] Export `getCurrentUserFocusHubLayout(innerConnections, focusUserId)` → `{ x, y, angle, ... }` on `INNER_RING_RADIUS` at `pickFocusPresentationAngle(...) + 180°`, or `null` if invalid.
-- [ ] Tests: focused at center; You helper not at center; monotonic helix radii for non-focused.
+- [x] Add `layoutMode === "focus_hub"` branch: focused node at `(GRAPH_CENTER, GRAPH_CENTER)`; non-focused on helix from hub (same Δr/angle step as `helix_focus`).
+- [x] Export `getCurrentUserFocusHubLayout(innerConnections, focusUserId)` → `{ x, y, angle, ... }` on `INNER_RING_RADIUS` at `pickFocusPresentationAngle(...) + 180°`, or `null` if invalid.
+- [x] Tests: focused at center; You helper not at center; monotonic helix radii for non-focused.
 
 ### Task 2: Wire graph SVG + immersive chrome
 
@@ -28,13 +28,13 @@
 - Modify: `frontend/src/pages/Connections.css`
 - Modify: `docs/THEME_GRAPH_HOOKS.md` (mark `focus_hub` implemented for immersive)
 
-- [ ] `innerLayoutOptions`: `{ layoutMode: "focus_hub" }` when `immersive && focusUserId`.
-- [ ] Center capsule: focused peer when `focus_hub` active + `focusUserId`; else You.
-- [ ] Skip inner `Node` for focused id when `focus_hub`; render You `Node` calling `onResetFocus`.
-- [ ] Inner edges: from `GRAPH_CENTER` to each visible inner + You; skip zero-length for focused.
-- [ ] Sheet: default **closed** (no `--peek`); `--open` when `sheetOpen`. FAB when `immersive && !sheetOpen` (any time, not only when focused).
-- [ ] Hero: context line + zoom only; **stats** in new **bottom dock** inside shell.
-- [ ] CSS: stage `flex: 1` / min-height for ~85% feel; dock + FAB positions; `--closed` sheet; `.connections__inner-node--you` if needed.
+- [x] `innerLayoutOptions`: `{ layoutMode: "focus_hub" }` when `immersive && focusUserId`.
+- [x] Center capsule: focused peer when `focus_hub` active + `focusUserId`; else You.
+- [x] Skip inner `Node` for focused id when `focus_hub`; render You `Node` calling `onResetFocus`.
+- [x] Inner edges: from `GRAPH_CENTER` to each visible inner + You; skip zero-length for focused.
+- [x] Sheet: default **closed** (no `--peek`); `--open` when `sheetOpen`. FAB when `immersive && !sheetOpen` (any time, not only when focused).
+- [x] Hero: context line + zoom only; **stats** in new **bottom dock** inside shell.
+- [x] CSS: stage `flex: 1` / min-height for ~85% feel; dock + FAB positions; `--closed` sheet; `.connections__inner-node--you` if needed.
 
 ### Task 3: Verify
 
