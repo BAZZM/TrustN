@@ -119,11 +119,11 @@ export default function Connections() {
       return base;
     }
 
-    if (base.some((item) => item.id === focusUserId)) {
+    if (base.some((item) => String(item.id) === String(focusUserId))) {
       return base;
     }
 
-    const focused = innerConnections.find((item) => item.id === focusUserId);
+    const focused = innerConnections.find((item) => String(item.id) === String(focusUserId));
 
     if (!focused) {
       return base;
@@ -138,7 +138,14 @@ export default function Connections() {
   }, [innerConnections, visibleInnerConnections]);
 
   const focusedConnection = useMemo(
-    () => innerConnections.find((item) => item.id === focusUserId) || null,
+    () => innerConnections.find((item) => String(item.id) === String(focusUserId)) || null,
+    [focusUserId, innerConnections]
+  );
+
+  const hasFocusedInnerPeer = useMemo(
+    () =>
+      focusUserId != null &&
+      innerConnections.some((item) => String(item.id) === String(focusUserId)),
     [focusUserId, innerConnections]
   );
 
@@ -205,7 +212,7 @@ export default function Connections() {
       return;
     }
 
-    if (!innerConnections.some((item) => item.id === focusUserId)) {
+    if (!innerConnections.some((item) => String(item.id) === String(focusUserId))) {
       setFocusUserId(null);
       setPickedSecondaryId(null);
       setIntroRequestError(null);
@@ -410,7 +417,7 @@ export default function Connections() {
     </motion.header>
   );
 
-  const focusSearchSlot = focusedConnection ? (
+  const focusSearchSlot = hasFocusedInnerPeer ? (
     <UnifiedSecondarySearchBar
       key={`connections-unified-secondary-${focusUserId}`}
       id="connections-unified-secondary-search"
@@ -545,6 +552,7 @@ export default function Connections() {
     selectedSecondaryId: pickedSecondaryId,
     focusExtras,
     focusSearchSlot,
+    secondarySearchActive: Boolean(focusUserId && debouncedSecondaryQuery),
     t,
   };
 

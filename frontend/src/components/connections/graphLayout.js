@@ -7,6 +7,7 @@
  * - Unfocused inners: faded (not removed) in focus mode.
  * - Node identity: peer_id via normalizeGraphNode.
  * - SVG paint order & hit-testing: secondary branch bodies and quick-add chips are drawn before inner-ring nodes so faded inners stay clickable where geometry overlaps; “+N more” chip is painted above but uses pointer-events:none (ConnectionsGraph + Connections.css). Stage-level “reset focus” ignores taps that originate on interactive nodes (see ConnectionsGraph.js).
+ * - `focus_hub` (immersive + focus): focused inner at viewBox center; other inners helix outward; use `getCurrentUserFocusHubLayout` for the current user on the ring.
  * - On mobile, pair this module with a native/ WebView shell; this file stays unchanged.
  */
 export const GRAPH_VIEWBOX = 420;
@@ -145,6 +146,32 @@ export function pickFocusPresentationAngle(nodes, focusUserId) {
   return best.angle;
 }
 
+/**
+ * When an inner peer is the geometric hub (`focus_hub`), place the current user on the inner ring,
+ * opposite the hub's presentation angle, so "You" stays readable and testably off-center.
+ */
+export function getCurrentUserFocusHubLayout(innerConnections, focusUserId) {
+  if (!focusUserId || !Array.isArray(innerConnections) || innerConnections.length === 0) {
+    return null;
+  }
+  const focusIndex = innerConnections.findIndex((node) => node.id === focusUserId);
+  if (focusIndex < 0) {
+    return null;
+  }
+  const presentationAngle = pickFocusPresentationAngle(innerConnections, focusUserId);
+  const youAngle = presentationAngle + 180;
+  const point = polarToCartesian(GRAPH_CENTER, GRAPH_CENTER, INNER_RING_RADIUS, youAngle);
+  return {
+    angle: youAngle,
+    x: point.x,
+    y: point.y,
+    opacity: 1,
+    scale: 0.9,
+    radius: 20,
+    isFocused: false,
+  };
+}
+
 export function getInnerRingLayout(nodes, focusUserId, options = {}) {
   const total = nodes.length;
 
@@ -158,6 +185,43 @@ export function getInnerRingLayout(nodes, focusUserId, options = {}) {
   const presentationAngle =
     focusIndex >= 0 ? pickFocusPresentationAngle(nodes, focusUserId) : -90;
   const rotation = focusIndex >= 0 ? presentationAngle - baseAngles[focusIndex] : 0;
+
+  if (focusIndex >= 0 && options.layoutMode === "focus_hub") {
+    const helixAxis = presentationAngle + 180;
+    let turnIndex = 0;
+    return nodes.map((node) => {
+      const isFocused = node.id === focusUserId;
+      if (isFocused) {
+        return {
+          ...node,
+          angle: presentationAngle,
+          x: GRAPH_CENTER,
+          y: GRAPH_CENTER,
+          isFocused: true,
+          opacity: 1,
+          scale: 1.18,
+          radius: 24,
+          turnIndex: -1,
+        };
+      }
+      const k = turnIndex;
+      turnIndex += 1;
+      const angle = helixAxis + k * HELIX_ANGLE_STEP_DEG;
+      const r = HELIX_R_MIN + k * HELIX_DELTA_R;
+      const point = polarToCartesian(GRAPH_CENTER, GRAPH_CENTER, r, angle);
+      return {
+        ...node,
+        angle,
+        x: point.x,
+        y: point.y,
+        isFocused: false,
+        opacity: 0.22,
+        scale: 0.7,
+        radius: 14,
+        turnIndex: k,
+      };
+    });
+  }
 
   if (focusIndex >= 0 && options.layoutMode === "helix_focus") {
     const helixAxis = presentationAngle + 180;

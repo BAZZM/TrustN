@@ -7,6 +7,7 @@ import {
   INNER_RING_RADIUS,
   SECONDARY_RING_RADIUS,
   SECONDARY_RING_RADIUS_FOCUSED,
+  getCurrentUserFocusHubLayout,
   getInnerRingLayout,
   getSecondaryRingLayout,
   pickFocusPresentationAngle,
@@ -163,5 +164,51 @@ describe("getInnerRingLayout with layoutMode helix_focus", () => {
       const r = Math.hypot(n.x - GRAPH_CENTER, n.y - GRAPH_CENTER);
       expect(r).toBeCloseTo(INNER_RING_RADIUS, 5);
     });
+  });
+});
+
+describe("getInnerRingLayout with layoutMode focus_hub", () => {
+  const nodes = [
+    { id: "a", name: "Alice", strength: 5 },
+    { id: "b", name: "Bob", strength: 4 },
+    { id: "c", name: "Carol", strength: 3 },
+    { id: "d", name: "Dave", strength: 2 },
+  ];
+
+  it("places the focused node at GRAPH_CENTER", () => {
+    const layout = getInnerRingLayout(nodes, "b", { layoutMode: "focus_hub" });
+    const focused = layout.find((n) => n.isFocused);
+    expect(focused.x).toBeCloseTo(GRAPH_CENTER, 5);
+    expect(focused.y).toBeCloseTo(GRAPH_CENTER, 5);
+  });
+
+  it("places non-focused nodes on an outward helix from the hub", () => {
+    const layout = getInnerRingLayout(nodes, "b", { layoutMode: "focus_hub" });
+    const others = layout.filter((n) => !n.isFocused);
+    others.forEach((n) => {
+      const r = Math.hypot(n.x - GRAPH_CENTER, n.y - GRAPH_CENTER);
+      expect(r).toBeGreaterThanOrEqual(HELIX_R_MIN - 0.01);
+    });
+  });
+
+  it("grows helix radius monotonically by turn index", () => {
+    const layout = getInnerRingLayout(nodes, "b", { layoutMode: "focus_hub" });
+    const others = layout
+      .filter((n) => !n.isFocused)
+      .slice()
+      .sort((a, b) => a.turnIndex - b.turnIndex);
+    for (let i = 1; i < others.length; i += 1) {
+      const r0 = Math.hypot(others[i - 1].x - GRAPH_CENTER, others[i - 1].y - GRAPH_CENTER);
+      const r1 = Math.hypot(others[i].x - GRAPH_CENTER, others[i].y - GRAPH_CENTER);
+      expect(r1 - r0).toBeCloseTo(HELIX_DELTA_R, 5);
+    }
+  });
+
+  it("getCurrentUserFocusHubLayout is on the inner ring and away from the hub", () => {
+    const you = getCurrentUserFocusHubLayout(nodes, "b");
+    expect(you).not.toBeNull();
+    const r = Math.hypot(you.x - GRAPH_CENTER, you.y - GRAPH_CENTER);
+    expect(r).toBeCloseTo(INNER_RING_RADIUS, 5);
+    expect(r).toBeGreaterThan(HELIX_R_MIN);
   });
 });

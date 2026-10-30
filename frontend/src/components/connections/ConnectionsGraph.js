@@ -6,6 +6,7 @@ import {
   GRAPH_VIEWBOX,
   MAX_VISIBLE_SECONDARY,
   NODE_HIT_PADDING,
+  getCurrentUserFocusHubLayout,
   getInnerRingLayout,
   getNodeInitials,
   getSecondaryRingLayout,
@@ -34,12 +35,19 @@ function Node({
   onSelect,
   disabled = false,
   selected = false,
+  searchHighlight = false,
   motionTransition,
   hitPadding = 10,
   tapSlop = 0,
   hideLabel = false,
 }) {
-  const rootClass = [className, selected ? `${className}--selected` : ""].filter(Boolean).join(" ");
+  const rootClass = [
+    className,
+    selected ? `${className}--selected` : "",
+    searchHighlight ? `${className}--search-hit` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const downRef = useRef(null);
   /** After pointer-up activation (desktop), ignore the synthetic click so secondary pick doesn’t toggle twice. */
   const suppressClickRef = useRef(false);
@@ -79,7 +87,12 @@ function Node({
     <motion.g
       className={rootClass}
       initial={false}
-      animate={{ x: node.x, y: node.y, opacity: node.opacity ?? 1, scale: node.scale ?? 1 }}
+      animate={{
+        x: node.x,
+        y: node.y,
+        opacity: searchHighlight ? Math.min(1, (node.opacity ?? 1) * 1.08) : node.opacity ?? 1,
+        scale: searchHighlight ? (node.scale ?? 1) * 1.04 : node.scale ?? 1,
+      }}
       transition={motionTransition}
       tabIndex={disabled ? -1 : 0}
       role={disabled ? undefined : "button"}
@@ -141,14 +154,16 @@ export default function ConnectionsGraph({
   statsSummary = null,
   immersiveStatsKey = null,
   requestsSlot = null,
+  secondarySearchActive = false,
 }) {
   const prefersReducedMotion = useReducedMotion();
   const [narrowViewport, setNarrowViewport] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [branchSearchOpen, setBranchSearchOpen] = useState(false);
   const [heroStatGlitch, setHeroStatGlitch] = useState(false);
   const prevImmersiveStatsKeyRef = useRef(null);
 
-  const pinchDisabled = !immersive || prefersReducedMotion;
+  const pinchDisabled = !immersive || prefersReducedMotion || branchSearchOpen;
   const { viewportRef, transformStyle, consumeShouldIgnoreTap, resetTransform, scale } = usePinchPanZoom({
     disabled: pinchDisabled,
   });
@@ -171,6 +186,32 @@ export default function ConnectionsGraph({
     return () => window.clearTimeout(id);
   }, [immersive, immersiveStatsKey]);
 
+  useEffect(() => {
+    if (!focusUserId) setBranchSearchOpen(false);
+  }, [focusUserId]);
+
+  useEffect(() => {
+    if (sheetOpen) setBranchSearchOpen(false);
+  }, [sheetOpen]);
+
+  useEffect(() => {
+    if (!branchSearchOpen) return undefined;
+    if (!focusSearchSlot) return undefined;
+    const id = window.setTimeout(() => {
+      document.getElementById("connections-unified-secondary-search")?.focus();
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [branchSearchOpen, focusSearchSlot]);
+
+  useEffect(() => {
+    if (!branchSearchOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") setBranchSearchOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [branchSearchOpen]);
+
   const nodeMotionTransition = prefersReducedMotion
     ? { duration: 0.12, ease: "linear" }
     : { type: "spring", stiffness: 280, damping: 26 };
@@ -181,14 +222,34 @@ export default function ConnectionsGraph({
   const innerHitPadding = narrowViewport ? NODE_HIT_PADDING : 10;
 
   const innerLayoutOptions = useMemo(
-    () =>
-      immersive && focusUserId ? { layoutMode: "helix_focus" } : undefined,
+    () => (immersive && focusUserId ? { layoutMode: "focus_hub" } : undefined),
     [immersive, focusUserId]
   );
   const innerLayout = useMemo(
     () => getInnerRingLayout(innerConnections, focusUserId, innerLayoutOptions),
     [innerConnections, focusUserId, innerLayoutOptions]
   );
+  const focusHubActive = useMemo(
+    () =>
+      immersive &&
+      Boolean(focusUserId) &&
+      innerConnections.some((n) => String(n.id) === String(focusUserId)),
+    [immersive, focusUserId, innerConnections]
+  );
+  const youHubLayout = useMemo(() => {
+    if (!focusHubActive) return null;
+    return getCurrentUserFocusHubLayout(innerConnections, focusUserId);
+  }, [focusHubActive, innerConnections, focusUserId]);
+  const youNodeForHub = useMemo(() => {
+    if (!youHubLayout) return null;
+    return {
+      ...youHubLayout,
+      id: "__you__",
+      name: currentUserName || t("connections.you"),
+      peerIntroduced: false,
+      strength: 0,
+    };
+  }, [youHubLayout, currentUserName, t]);
   const focusPresentationAngle = useMemo(
     () => (focusUserId ? pickFocusPresentationAngle(innerConnections, focusUserId) : null),
     [innerConnections, focusUserId]
@@ -200,6 +261,13 @@ export default function ConnectionsGraph({
   );
   const hiddenSecondaryCount = Math.max(0, secondaryConnections.length - visibleSecondary.length);
   const focusedLayoutNode = innerLayout.find((item) => item.isFocused) || null;
+  const centerHubName = focusHubActive
+    ? focusedConnection?.name || focusedLayoutNode?.name || currentUserName || t("connections.you")
+    : currentUserName || t("connections.you");
+  const centerHubCaption = focusHubActive ? t("connections.inner") : t("connections.you");
+
+  const secondarySearchHighlight =
+    Boolean(secondarySearchActive) && secondaryConnections.length > 0 && !secondaryLoading;
 
   const tapSlop = immersive ? 14 : 0;
 
@@ -230,19 +298,35 @@ export default function ConnectionsGraph({
         className="connections__guide-ring connections__guide-ring--inner"
       />
 
-      {innerLayout.map((node) => (
+      {innerLayout.map((node) => {
+        if (focusHubActive && node.isFocused) return null;
+        return (
+          <motion.line
+            key={`edge-${node.id}`}
+            x1={GRAPH_CENTER}
+            y1={GRAPH_CENTER}
+            x2={node.x}
+            y2={node.y}
+            className="connections__edge connections__edge--inner"
+            initial={false}
+            animate={{ opacity: focusUserId && !node.isFocused ? 0.1 : 0.45 }}
+            transition={edgeMotionTransition(0.2)}
+          />
+        );
+      })}
+      {focusHubActive && youHubLayout && (
         <motion.line
-          key={`edge-${node.id}`}
+          key="edge-current-user"
           x1={GRAPH_CENTER}
           y1={GRAPH_CENTER}
-          x2={node.x}
-          y2={node.y}
+          x2={youHubLayout.x}
+          y2={youHubLayout.y}
           className="connections__edge connections__edge--inner"
           initial={false}
-          animate={{ opacity: focusUserId && !node.isFocused ? 0.1 : 0.45 }}
+          animate={{ opacity: 0.45 }}
           transition={edgeMotionTransition(0.2)}
         />
-      ))}
+      )}
 
       {focusUserId &&
         secondaryLayout.map((node) => (
@@ -254,7 +338,7 @@ export default function ConnectionsGraph({
             y2={node.y}
             className="connections__edge connections__edge--secondary"
             initial={prefersReducedMotion ? false : { opacity: 0 }}
-            animate={{ opacity: 0.46 }}
+            animate={{ opacity: secondarySearchHighlight ? 0.58 : 0.46 }}
             transition={edgeMotionTransition(0.22)}
           />
         ))}
@@ -278,10 +362,10 @@ export default function ConnectionsGraph({
         <circle cx={GRAPH_CENTER} cy={GRAPH_CENTER} r="48" className="connections__center-glow" />
         <circle cx={GRAPH_CENTER} cy={GRAPH_CENTER} r="34" className="connections__center-core" />
         <text x={GRAPH_CENTER} y={GRAPH_CENTER - 4} textAnchor="middle" className="connections__center-name">
-          {truncateLabel(currentUserName || t("connections.you"), 18)}
+          {truncateLabel(centerHubName, 18)}
         </text>
         <text x={GRAPH_CENTER} y={GRAPH_CENTER + 18} textAnchor="middle" className="connections__center-caption">
-          {t("connections.you")}
+          {centerHubCaption}
         </text>
       </g>
 
@@ -296,6 +380,7 @@ export default function ConnectionsGraph({
             onSelect={onSelectSecondary}
             disabled={!onSelectSecondary}
             selected={Boolean(selectedSecondaryId && selectedSecondaryId === node.id)}
+            searchHighlight={secondarySearchHighlight}
             motionTransition={nodeMotionTransition}
             hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
             tapSlop={immersive ? tapSlop : 0}
@@ -343,22 +428,37 @@ export default function ConnectionsGraph({
         );
       })}
 
-      {innerLayout.map((node) => (
+      {innerLayout
+        .filter((node) => !(focusHubActive && node.isFocused))
+        .map((node) => (
+          <Node
+            key={`inner-node-${node.id}`}
+            node={node}
+            label={node.name}
+            className={
+              "connections__inner-node" +
+              (node.peerIntroduced ? " connections__inner-node--acquired" : "")
+            }
+            labelClassName="connections__inner-label"
+            onSelect={onFocusConnection}
+            motionTransition={nodeMotionTransition}
+            hitPadding={innerHitPadding}
+            tapSlop={tapSlop}
+          />
+        ))}
+      {focusHubActive && youNodeForHub && (
         <Node
-          key={`inner-node-${node.id}`}
-          node={node}
-          label={node.name}
-          className={
-            "connections__inner-node" +
-            (node.peerIntroduced ? " connections__inner-node--acquired" : "")
-          }
+          key="inner-node-you"
+          node={youNodeForHub}
+          label={youNodeForHub.name}
+          className="connections__inner-node connections__inner-node--you"
           labelClassName="connections__inner-label"
-          onSelect={onFocusConnection}
+          onSelect={() => onResetFocus?.()}
           motionTransition={nodeMotionTransition}
           hitPadding={innerHitPadding}
           tapSlop={tapSlop}
         />
-      ))}
+      )}
 
       {secondaryLayout.map((node) => (
         <text
@@ -366,7 +466,10 @@ export default function ConnectionsGraph({
           x={node.x}
           y={node.y + node.radius + 24}
           textAnchor="middle"
-          className="connections__secondary-label connections__secondary-label--floating"
+          className={
+            "connections__secondary-label connections__secondary-label--floating" +
+            (secondarySearchHighlight ? " connections__secondary-label--search-hit" : "")
+          }
           data-testid="secondary-floating-label"
         >
           {truncateLabel(node.name, 14)}
@@ -412,7 +515,7 @@ export default function ConnectionsGraph({
               ? t("connections.loadingBranch")
               : t("connections.focusSummary").replace("{count}", String(secondaryConnections.length))}
           </p>
-          {focusSearchSlot ? (
+          {focusSearchSlot && !immersive ? (
             <div className="connections__focus-search" onClick={(e) => e.stopPropagation()}>
               {focusSearchSlot}
             </div>
@@ -450,8 +553,8 @@ export default function ConnectionsGraph({
 
   if (immersive) {
     const heroContextLine = focusUserId ? t("connections.heroLineFocus") : t("connections.heroLineOverview");
-    const statsWrapClass =
-      "connections__immersive-hero-stats" +
+    const dockStatsClass =
+      "connections__immersive-dock-stats" +
       (heroStatGlitch ? " connections__immersive-hero-stats--glitch" : "");
 
     return (
@@ -467,7 +570,7 @@ export default function ConnectionsGraph({
         >
           <div className="connections__immersive-hero-wrap">
             <div
-              className="connections__immersive-hero-capsule"
+              className="connections__immersive-hero-capsule connections__immersive-hero-capsule--minimal"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
@@ -483,11 +586,6 @@ export default function ConnectionsGraph({
                   </button>
                 )}
               </div>
-              {statsSummary ? (
-                <div className={statsWrapClass} aria-label={t("connections.networkSummary")}>
-                  {statsSummary}
-                </div>
-              ) : null}
             </div>
           </div>
           <div ref={viewportRef} className="connections__pinch-inner" style={transformStyle}>
@@ -495,33 +593,140 @@ export default function ConnectionsGraph({
           </div>
         </div>
 
-        {focusUserId && !sheetOpen && (
-          <button
-            type="button"
-            className="connections__fab"
-            aria-label={t("connections.heroFabAria")}
-            onClick={() => setSheetOpen(true)}
-          >
-            {t("connections.expandDetails")}
-          </button>
-        )}
+        {statsSummary ? (
+          <div className="connections__immersive-bottom-dock" aria-label={t("connections.networkSummary")}>
+            <div className={dockStatsClass}>{statsSummary}</div>
+          </div>
+        ) : null}
+
+        {!sheetOpen && !branchSearchOpen ? (
+          <div className="connections__immersive-fab-dock">
+            <button
+              type="button"
+              className="connections__fab connections__fab--branch-search"
+              aria-label={t("connections.branchSearchFabAria")}
+              onClick={() => {
+                setSheetOpen(false);
+                setBranchSearchOpen(true);
+              }}
+            >
+              {t("connections.branchSearchFabLabel")}
+            </button>
+            <button
+              type="button"
+              className="connections__fab"
+              aria-label={t("connections.heroFabAria")}
+              onClick={() => {
+                setBranchSearchOpen(false);
+                setSheetOpen(true);
+              }}
+            >
+              {t("connections.expandDetails")}
+            </button>
+          </div>
+        ) : null}
+
+        {immersive && branchSearchOpen ? (
+          <div className="connections__branch-search-overlay" role="presentation">
+            <button
+              type="button"
+              className="connections__branch-search-dismiss"
+              aria-label={t("connections.branchSearchDismissAria")}
+              onClick={() => setBranchSearchOpen(false)}
+            />
+            <div
+              className="connections__branch-search-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="connections-branch-search-title"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <div className="connections__branch-search-beam" aria-hidden />
+              <div className="connections__branch-search-head">
+                <span id="connections-branch-search-title" className="connections__branch-search-title">
+                  {t("connections.branchSearchTitle")}
+                </span>
+                <button
+                  type="button"
+                  className="connections__branch-search-close"
+                  aria-label={t("connections.branchSearchCloseAria")}
+                  onClick={() => setBranchSearchOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+              {focusSearchSlot ? (
+                <>
+                  <div className="connections__branch-search-field">{focusSearchSlot}</div>
+                  <p className="connections__branch-search-hint">{t("connections.branchSearchHint")}</p>
+                  <ul className="connections__branch-search-results" aria-label={t("connections.branchSearchResultsAria")}>
+                    {!secondaryLoading && !secondarySearchActive ? (
+                      <li className="connections__branch-search-results__meta">
+                        {t("connections.branchSearchTypeHint")}
+                      </li>
+                    ) : null}
+                    {secondaryLoading && secondarySearchActive ? (
+                      <li className="connections__branch-search-results__meta">{t("connections.loadingBranch")}</li>
+                    ) : null}
+                    {!secondaryLoading &&
+                    secondarySearchActive &&
+                    focusUserId &&
+                    secondaryConnections.length === 0 ? (
+                      <li className="connections__branch-search-results__meta">
+                        {t("connections.noSecondaryUnified")}
+                      </li>
+                    ) : null}
+                    {!secondaryLoading && secondarySearchActive && focusUserId && secondaryConnections.length > 0
+                      ? secondaryConnections.slice(0, 14).map((row) => (
+                          <li key={`branch-search-hit-${row.id}`}>
+                            <button
+                              type="button"
+                              className="connections__branch-search-result-btn"
+                              onClick={() => {
+                                onSelectSecondary?.(row);
+                                setBranchSearchOpen(false);
+                                resetTransform();
+                              }}
+                            >
+                              <span className="connections__branch-search-result-name">
+                                {truncateLabel(row.name, 28)}
+                              </span>
+                              <span className="connections__branch-search-result-meta">
+                                {[row.jobRole, row.industry].filter(Boolean).join(" · ") || t("connections.secondary")}
+                              </span>
+                            </button>
+                          </li>
+                        ))
+                      : null}
+                  </ul>
+                </>
+              ) : (
+                <p className="connections__branch-search-need-focus">{t("connections.branchSearchNeedFocus")}</p>
+              )}
+            </div>
+          </div>
+        ) : null}
         <div
           className={
             "connections__sheet" +
             " connections__sheet--overlay" +
-            (sheetOpen ? " connections__sheet--open" : " connections__sheet--peek")
+            (sheetOpen ? " connections__sheet--open" : " connections__sheet--closed")
           }
+          aria-hidden={!sheetOpen}
         >
           <div className="connections__sheet-static">{focusCard}</div>
-          <button
-            type="button"
-            className="connections__sheet-handle"
-            onClick={() => setSheetOpen((o) => !o)}
-            aria-expanded={sheetOpen}
-          >
-            <span className="connections__sheet-handle-bar" aria-hidden />
-            <span className="connections__sheet-handle-label">{t("connections.sheetPullHint")}</span>
-          </button>
+          {sheetOpen ? (
+            <button
+              type="button"
+              className="connections__sheet-handle"
+              onClick={() => setSheetOpen(false)}
+              aria-expanded={sheetOpen}
+            >
+              <span className="connections__sheet-handle-bar" aria-hidden />
+              <span className="connections__sheet-handle-label">{t("connections.sheetPullHint")}</span>
+            </button>
+          ) : null}
           <div className="connections__sheet-scroll">
             {overflowPanel}
             {requestsSlot ? <div className="connections__sheet-requests">{requestsSlot}</div> : null}

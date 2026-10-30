@@ -27,6 +27,8 @@ const translations = {
   "connections.heroLineFocus": "Focus hero",
   "connections.heroFabAria": "Open details and requests",
   "connections.expandDetails": "Details",
+  "connections.branchSearchFabAria": "Search people in this branch",
+  "connections.branchSearchFabLabel": "Search",
 };
 
 function t(key) {
@@ -135,7 +137,7 @@ describe("ConnectionsGraph", () => {
     expect(floatingLabels[0].textContent).toBe("Paul Parker");
   });
 
-  it("renders the immersive sheet in peek state by default and reveals the FAB", () => {
+  it("starts with the immersive sheet fully hidden (no peek) and always shows the FAB", () => {
     const root = createRoot(container);
 
     act(() => {
@@ -162,11 +164,42 @@ describe("ConnectionsGraph", () => {
 
     const sheet = container.querySelector(".connections__sheet");
     expect(sheet).toBeTruthy();
-    expect(sheet.classList.contains("connections__sheet--peek")).toBe(true);
+    expect(sheet.classList.contains("connections__sheet--closed")).toBe(true);
     expect(sheet.classList.contains("connections__sheet--open")).toBe(false);
+    expect(sheet.classList.contains("connections__sheet--peek")).toBe(false);
 
-    const fab = container.querySelector(".connections__fab");
-    expect(fab).toBeTruthy();
-    expect(fab.getAttribute("aria-label")).toBe("Open details and requests");
+    const fabs = [...container.querySelectorAll(".connections__fab")];
+    expect(fabs.length).toBe(2);
+    const ariaLabels = fabs.map((el) => el.getAttribute("aria-label"));
+    expect(ariaLabels).toContain("Open details and requests");
+    expect(ariaLabels).toContain("Search people in this branch");
+  });
+
+  it("shows the FAB on immersive overview (no inner focus)", () => {
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <ConnectionsGraph
+          currentUserName="Alice"
+          innerConnections={[
+            { id: "1", name: "Diana Davis", strength: 5 },
+            { id: "2", name: "Bob Brown", strength: 4 },
+          ]}
+          overflowInnerConnections={[]}
+          focusUserId={null}
+          focusedConnection={null}
+          secondaryConnections={[]}
+          secondaryLoading={false}
+          onFocusConnection={jest.fn()}
+          onResetFocus={jest.fn()}
+          t={t}
+          immersive
+        />
+      );
+    });
+
+    const fabs = [...container.querySelectorAll(".connections__fab")];
+    expect(fabs.length).toBe(2);
   });
 });
