@@ -116,6 +116,7 @@ const en = {
     importHint: "Paste one contact per line: phone, name (e.g. +1234567890, Jane)",
     noContacts: "No contacts yet. Import your contact list to find people on Intro.",
     matched: "On Intro",
+    inCircle: "In circle",
     notMatched: "Not on Intro",
     addToSecondary: "Add to secondary circle",
     requestSent: "Request sent",
