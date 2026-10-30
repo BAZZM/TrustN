@@ -202,4 +202,40 @@ describe("ConnectionsGraph", () => {
     const fabs = [...container.querySelectorAll(".connections__fab")];
     expect(fabs.length).toBe(2);
   });
+
+  it("styles the You hub node and acquired inners with the base node class suffixes", () => {
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(
+        <ConnectionsGraph
+          currentUserName="Alice"
+          innerConnections={[
+            { id: "1", name: "Diana Davis", strength: 5, peerIntroduced: true },
+            { id: "2", name: "Bob Brown", strength: 4 },
+          ]}
+          overflowInnerConnections={[]}
+          focusUserId="2"
+          focusedConnection={{ id: "2", name: "Bob Brown" }}
+          secondaryConnections={[]}
+          secondaryLoading={false}
+          onFocusConnection={jest.fn()}
+          onResetFocus={jest.fn()}
+          t={t}
+          immersive
+        />
+      );
+    });
+
+    // Suffixes must hang off the base class; "...--you__core" has no CSS and renders as a black disc.
+    expect(container.querySelectorAll(".connections__inner-node--you__core").length).toBe(0);
+    expect(container.querySelectorAll(".connections__inner-node--acquired__core").length).toBe(0);
+    const youCores = container.querySelectorAll(
+      ".connections__inner-node--you .connections__inner-node__core"
+    );
+    expect(youCores.length).toBe(1);
+    expect(
+      container.querySelectorAll(".connections__inner-node--acquired .connections__inner-node__hit").length
+    ).toBe(1);
+  });
 });

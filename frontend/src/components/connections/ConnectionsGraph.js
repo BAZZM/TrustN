@@ -41,10 +41,12 @@ function Node({
   tapSlop = 0,
   hideLabel = false,
 }) {
+  // className may carry modifiers ("base base--acquired"); element suffixes hang off the base token only.
+  const baseClass = className.split(" ")[0];
   const rootClass = [
     className,
-    selected ? `${className}--selected` : "",
-    searchHighlight ? `${className}--search-hit` : "",
+    selected ? `${baseClass}--selected` : "",
+    searchHighlight ? `${baseClass}--search-hit` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -117,10 +119,10 @@ function Node({
         }
       }}
     >
-      <circle r={node.radius + hitPadding} className={`${className}__hit`} />
-      <circle r={node.radius + 4} className={`${className}__halo`} />
-      <circle r={node.radius} className={`${className}__core`} />
-      <text textAnchor="middle" dominantBaseline="central" className={`${className}__glyph`}>
+      <circle r={node.radius + hitPadding} className={`${baseClass}__hit`} />
+      <circle r={node.radius + 4} className={`${baseClass}__halo`} />
+      <circle r={node.radius} className={`${baseClass}__core`} />
+      <text textAnchor="middle" dominantBaseline="central" className={`${baseClass}__glyph`}>
         {getNodeInitials(node.name)}
       </text>
       {!hideLabel && (

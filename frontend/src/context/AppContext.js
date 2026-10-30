@@ -13,6 +13,25 @@ const defaultTheme = {
   },
 };
 
+// Registered at module load, not in an effect: child effects run before AppProvider's, so an
+// effect-based interceptor misses the first requests on a cold load and they 401.
+axios.interceptors.request.use(
+  (config) => {
+    // Always read localStorage so a freshly stored token is picked up
+    try {
+      const currentToken = localStorage.getItem("intro_token");
+      if (currentToken) {
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Bearer ${currentToken}`;
+      }
+    } catch (_) {
+      /* storage unavailable: send the request unauthenticated */
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
@@ -68,25 +87,6 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     axios.get(baseURL + "/api/themes").then((r) => setThemesList(r.data.themes || [])).catch(() => {});
-  }, []);
-
-  // Set up axios interceptor once on mount - always check localStorage for token
-  useEffect(() => {
-    const requestInterceptor = axios.interceptors.request.use(
-      (config) => {
-        // Always check localStorage for latest token (in case it was updated)
-        const currentToken = localStorage.getItem("intro_token");
-        if (currentToken) {
-          config.headers = config.headers || {};
-          config.headers.Authorization = `Bearer ${currentToken}`;
-        }
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
-    return () => {
-      axios.interceptors.request.eject(requestInterceptor);
-    };
   }, []);
 
   const value = {

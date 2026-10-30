@@ -1005,10 +1005,16 @@
   background: transparent;
   aspect-ratio: unset;
   overflow: visible;
+  /* Beat the mobile `.connections__graph-stage { order: 1 }` so the dock + FAB sit below the stage */
+  order: 0;
 }
 
-/* Nudge graph centre upward so lower nodes clear the dock + FAB cluster */
+/* Keep the graph clear of the hero line above and the dock + FAB cluster below */
 .connections__graph-stage--immersive .connections__pinch-inner {
+  /* Fill the whole stage (percentage height collapsed to content) so the graph centres vertically */
+  position: absolute;
+  inset: 0;
+  padding-top: 52px;
   padding-bottom: clamp(28px, 9vmin, 76px);
   box-sizing: border-box;
 }
