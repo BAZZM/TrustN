@@ -16,6 +16,7 @@
 | `normalizeGraphNode` | Map API rows to a single `peer_id`-centric node shape. |
 | `sortConnectionsByPriority` | Deterministic sort (strength, recency, name, id). |
 | `polarToCartesian`, `getInnerRingLayout`, `getSecondaryRingLayout` | Math for positions, opacity, scale. `getSecondaryRingLayout(nodes, focusAngle?)` takes an optional focus angle to switch from the default arc to a focused fan. |
+| `getCurrentUserFocusHubLayout` | `focus_hub` only: position of the current user on the inner ring, opposite the focused hub, since the focused peer takes `GRAPH_CENTER`. Returns `null` when the focus id is not an inner peer. |
 | `pickFocusPresentationAngle` | Deterministic angle picker used by `getInnerRingLayout` when a branch is focused; rotates the focused inner node into the clearest wedge. |
 | `GRAPH_VIEWBOX`, `GRAPH_CENTER`, `INNER_RING_RADIUS`, `SECONDARY_RING_RADIUS`, `SECONDARY_RING_RADIUS_FOCUSED`, `FOCUS_FAN_DEGREES` | Coordinate system. `SECONDARY_RING_RADIUS_FOCUSED` and `FOCUS_FAN_DEGREES` apply only when an inner connection is focused. |
 | `MAX_VISIBLE_INNER`, `MAX_VISIBLE_SECONDARY` | Default caps for the first screen. |
@@ -34,4 +35,5 @@ Collapsible panel for connection requests. Uses `framer-motion` for the drawer; 
 
 Documented at the top of `graphLayout.js` (N, focus = fade, identity rule). Change only with explicit product sign-off.
 
+- **Inner layout modes** (`getInnerRingLayout(nodes, focusUserId, { layoutMode })`): `ring` (default), `ring_focus` (legacy fade), `helix_focus` (You at center, others coil in), and `focus_hub` (focused peer at `GRAPH_CENTER`, You on the ring, others on a helix from the hub). The immersive graph, shown only on narrow viewports, uses `focus_hub` while a peer is focused; desktop keeps the ring. See `docs/THEME_GRAPH_HOOKS.md`.
 - **Adaptive focus wedge:** when an inner connection is selected, the inner ring rotates so the focused node lands on the clearest available angle from `FOCUS_PRESENTATION_CANDIDATES`. Secondary nodes are placed on `SECONDARY_RING_RADIUS_FOCUSED` along a fan of `FOCUS_FAN_DEGREES` centred on the focused node so labels stay readable.

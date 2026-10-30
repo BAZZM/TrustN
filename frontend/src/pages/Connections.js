@@ -57,6 +57,7 @@ export default function Connections() {
   const [requestInbox, setRequestInbox] = useState([]);
   const [requestSent, setRequestSent] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [requestsOpen, setRequestsOpen] = useState(false);
   const [respondingId, setRespondingId] = useState(null);
   const [focusUserId, setFocusUserId] = useState(null);
@@ -75,6 +76,7 @@ export default function Connections() {
     }
 
     setLoading(true);
+    setLoadError(false);
 
     return Promise.all([
       axios.get(baseURL + "/api/connections"),
@@ -89,6 +91,7 @@ export default function Connections() {
         setConnections([]);
         setRequestInbox([]);
         setRequestSent([]);
+        setLoadError(true);
       })
       .finally(() => {
         setLoading(false);
@@ -640,7 +643,17 @@ export default function Connections() {
 
           {loading && <div className="connections__loading">{t("connections.loadingGraph")}</div>}
 
-          {!loading && innerConnections.length === 0 && (
+          {!loading && loadError && (
+            <section className="connections__empty-state" role="alert">
+              <h2 className="connections__empty-title">{t("connections.loadErrorTitle")}</h2>
+              <p className="connections__empty-copy">{t("connections.loadErrorBody")}</p>
+              <button type="button" className="connections__fab" onClick={() => loadConnectionsPage()}>
+                {t("connections.retry")}
+              </button>
+            </section>
+          )}
+
+          {!loading && !loadError && innerConnections.length === 0 && (
             <section className="connections__empty-state">
               <h2 className="connections__empty-title">{t("connections.emptyTitle")}</h2>
               <p className="connections__empty-copy">{t("connections.emptyBody")}</p>

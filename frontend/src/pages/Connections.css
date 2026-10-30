@@ -126,6 +126,10 @@
   line-height: 1.5;
 }
 
+.connections__empty-state .connections__fab {
+  margin-top: var(--space-md);
+}
+
 .connections__graph-stage {
   position: relative;
   width: 100%;
