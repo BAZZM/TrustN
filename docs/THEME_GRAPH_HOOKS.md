@@ -34,9 +34,10 @@ Future (add when implemented):
 |------|------|----------|
 | `ring` | Default; no focus | Current evenly spaced inner ring |
 | `ring_focus` | Legacy focus behavior | Full ring + fade non-focused (pre-helix) |
-| `helix_focus` | Immersive + `focusUserId` *(implemented 2026-05-18)* | Focused on main inner radius; others on Archimedean coil. Constants: `HELIX_R_MIN`, `HELIX_DELTA_R`, `HELIX_ANGLE_STEP_DEG`. |
+| `helix_focus` | Immersive + `focusUserId` *(implemented 2026-05-18)* | Focused on main inner radius; **You** remain at `GRAPH_CENTER`; others on Archimedean coil toward center. Constants: `HELIX_R_MIN`, `HELIX_DELTA_R`, `HELIX_ANGLE_STEP_DEG`. |
+| `focus_hub` | Immersive + `focusUserId` *(2026-05-17)* | **Focused inner at `GRAPH_CENTER`**; **You** on inner ring via `getCurrentUserFocusHubLayout`; other inners on helix from hub. Immersive graph uses this instead of `helix_focus`. |
 
-**Extension pattern:** `getInnerRingLayout(nodes, focusUserId, options)` where `options.layoutMode` is `'ring' | 'helix_focus'` (names subject to implementation). Default preserves today’s behavior for non-immersive routes.
+**Extension pattern:** `getInnerRingLayout(nodes, focusUserId, options)` where `options.layoutMode` is `'ring' | 'ring_focus' | 'helix_focus' | 'focus_hub'`. Default preserves today’s behavior for non-immersive routes.
 
 ---
 
@@ -70,3 +71,5 @@ Server delivers with theme payload; frontend maps to `options` for `getInnerRing
 |------|--------|
 | 2026-05-18 | Initial document; helix_focus mode specified in design spec `2026-05-18-connections-immersive-helix-focus-design.md` |
 | 2026-05-18 | `helix_focus` implemented in `graphLayout.js` with constants `HELIX_R_MIN=56`, `HELIX_DELTA_R=10`, `HELIX_ANGLE_STEP_DEG=52`; peek sheet + FAB landed in `ConnectionsGraph.js` / `Connections.css`. |
+| 2026-05-18 | Spec `2026-05-18-connections-immersive-fullbleed-focus-hub-design.md` adds **`focus_hub`** (hub-centered geometry + full-bleed chrome). |
+| 2026-05-17 | Immersive `ConnectionsGraph` wired to **`focus_hub`**; chrome: minimal hero, stats dock, FAB, sheet **closed \| open** (no peek). |

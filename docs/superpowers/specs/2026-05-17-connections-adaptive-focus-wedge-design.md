@@ -1,4 +1,4 @@
-# Connections — adaptive focus wedge for selected branch
+z\ q# Connections — adaptive focus wedge for selected branch
 
 **Status:** Brainstorming design, awaiting user review before implementation planning  
 **Last updated:** 2026-05-17  
