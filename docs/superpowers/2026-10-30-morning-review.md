@@ -28,7 +28,7 @@ Details and the findings are in `plans/2026-10-30-round3-hardening-and-polish.md
 - http://localhost:3000, log in with the demo phone `+1234567890` (no code needed locally).
 - **Connections** on a phone-sized window or a desktop window: tap **Ask**, type `who is a content writer`, tap Kate King. The branch opens, she is selected, and the path lights up.
 - Try `anyone in software` (finds engineers *and* people whose industry says Software) and `médecin à Zürich` (no longer mangled).
-- `http://localhost:3000/connections?layout=free` turns on the draggable layout; `?layout=fixed` turns it off.
+- The graph now floats and is draggable **by default** (this changed after the first morning check; see the follow-up below). `?layout=fixed` or the "Free layout" pill turns it off.
 - Keyboard: arrow keys move between inner nodes, Enter opens a branch, Escape clears it; Tab inside a modal stays inside.
 
 ## Decisions waiting for you
@@ -53,3 +53,12 @@ cd backend && npx jest --runInBand
 - The `/code-review` skill and `security-review` skill could not scan the whole branch (`origin/HEAD` is not set in this repo), so the second review was done by hand; no injection, authorization or secret-handling problems found. One memory-growth issue was found and fixed (unbounded regex cache).
 - Free layout: reduced-motion behavior is covered by hook tests but I did not eyeball it in the browser; there is no before/after screenshot diff with the flag off.
 - `.claude/launch.json` (dev server config I added) and `scripts/install-wsl-for-docker.ps1` are untracked; decide whether to keep them.
+
+## Follow-up: "the Connections screen didn't move"
+
+A first look at the screen found it static. Causes, all fixed in the working tree (uncommitted):
+
+1. **Free layout was off by default**, behind a small pill, so a normal visit showed a still ring. It is now **on by default** (still switchable off).
+2. **A real mouse drag never started.** The pointer was only captured after the drag threshold, on a handler that stops receiving events once the cursor leaves the node, so fast drags went to the SVG instead. My earlier check used synthetic events fired straight at the node, which skip hit-testing and hid this. The pointer is now captured on press; real fast drags of inner and secondary nodes were verified in the browser.
+3. **No idle motion.** The "gentle drift" from the original suggestion had been left out. Nodes now float a few pixels out of phase with each other by CSS alone (the physics loop still sleeps, so idle JavaScript cost stays at zero).
+

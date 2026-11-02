@@ -1372,6 +1372,33 @@
   color: var(--color-accent);
 }
 
+/* Idle drift: each node's body wanders a few units on a slow loop, out of phase with its neighbours.
+   CSS only, so the physics loop can sleep; skipped entirely for reduced motion. */
+@keyframes connections-node-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  25% {
+    transform: translate(4.4px, -3.2px);
+  }
+
+  50% {
+    transform: translate(-2.6px, 4.6px);
+  }
+
+  75% {
+    transform: translate(-4.6px, -1.9px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .connections__node-body--drift {
+    animation: connections-node-drift var(--drift-dur, 10s) ease-in-out var(--drift-delay, 0s) infinite;
+  }
+}
+
 /* Free-layout switch in the hero capsule; pressed = nodes are draggable and settle by physics */
 .connections__layout-toggle {
   flex: 0 0 auto;

@@ -32,7 +32,11 @@ function graphClickWasOnInteractiveSurface(nativeEvent) {
 
 const LAYOUT_STORAGE_KEY = "intro_graph_layout";
 
-/** `?layout=free|fixed` wins and is remembered; otherwise the stored choice; default is the fixed layout. */
+/**
+ * `?layout=free|fixed` wins and is remembered; otherwise the stored choice. Free layout is the
+ * default: the graph is meant to feel loose and alive, and a feature behind an unlabelled switch
+ * is a feature nobody sees.
+ */
 function readFreeLayoutPreference() {
   try {
     const fromUrl = new URLSearchParams(window.location.search).get("layout");
@@ -40,9 +44,9 @@ function readFreeLayoutPreference() {
       window.localStorage.setItem(LAYOUT_STORAGE_KEY, fromUrl);
       return fromUrl === "free";
     }
-    return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === "free";
+    return window.localStorage.getItem(LAYOUT_STORAGE_KEY) !== "fixed";
   } catch (_) {
-    return false;
+    return true;
   }
 }
 
@@ -66,6 +70,14 @@ function withLivePosition(positions, key, node, cache) {
   const value = { ...node, x: live.x, y: live.y };
   cache.set(key, { base: node, x: live.x, y: live.y, value });
   return value;
+}
+
+/** A stable 0..1 number per node id, so every node drifts with its own phase and speed. */
+function idleSeed(id) {
+  let h = 0;
+  const text = String(id);
+  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  return (h % 1000) / 1000;
 }
 
 /** SVG user-space point under a pointer event (accounts for CSS transforms such as pinch-zoom). */
@@ -100,6 +112,7 @@ function NodeBase({
   onDrag,
   onDragEnd,
   instant = false,
+  drift = false,
 }) {
   // className may carry modifiers ("base base--acquired"); element suffixes hang off the base token only.
   const baseClass = className.split(" ")[0];
@@ -118,6 +131,16 @@ function NodeBase({
   function pointerDown(e) {
     if (disabled || tapSlop <= 0) return;
     downRef.current = { x: e.clientX, y: e.clientY };
+    if (onDrag) {
+      // Capture on press, not once the drag starts: real mouse input is hit-tested, so after the
+      // first fast move the cursor is no longer over this node and its move/up events would go to
+      // whatever is underneath, and the drag would never begin.
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (_) {
+        /* pointer already released or capture unsupported: plain events still work for slow drags */
+      }
+    }
   }
 
   function pointerMove(e) {
@@ -125,11 +148,6 @@ function NodeBase({
     const moved = Math.hypot(e.clientX - downRef.current.x, e.clientY - downRef.current.y);
     if (!draggingRef.current && moved > tapSlop) {
       draggingRef.current = true;
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch (_) {
-        /* pointer already released: the drag still follows move events on the node */
-      }
     }
     if (draggingRef.current) {
       const point = pointerToViewBox(e);
@@ -184,6 +202,11 @@ function NodeBase({
   // `instant`: another system (the physics step) owns the position every frame, so it is applied as
   // plain style instead of being animated. (A zero-duration animation from `initial={false}` is
   // never rendered by framer-motion, which left nodes without any transform.)
+  const seed = idleSeed(node.id);
+  const driftStyle = {
+    "--drift-dur": `${(6 + seed * 5).toFixed(2)}s`,
+    "--drift-delay": `-${(seed * 12).toFixed(2)}s`,
+  };
   const motionProps = instant
     ? { style: target }
     : { initial: false, animate: target, transition: motionTransition };
@@ -228,17 +251,24 @@ function NodeBase({
         }
       }}
     >
-      <circle r={node.radius + hitPadding} className={`${baseClass}__hit`} />
-      <circle r={node.radius + 4} className={`${baseClass}__halo`} />
-      <circle r={node.radius} className={`${baseClass}__core`} />
-      <text textAnchor="middle" dominantBaseline="central" className={`${baseClass}__glyph`}>
-        {getNodeInitials(node.name)}
-      </text>
-      {!hideLabel && (
-        <text y={node.radius + 24} textAnchor="middle" className={labelClassName}>
-          {truncateLabel(label, 14)}
+      {/* The body drifts by CSS alone (a few units, slow, out of phase per node), so the graph feels
+          alive while idle without a JavaScript loop. Position and physics live on the outer group. */}
+      <g
+        className={"connections__node-body" + (drift ? " connections__node-body--drift" : "")}
+        style={drift ? driftStyle : undefined}
+      >
+        <circle r={node.radius + hitPadding} className={`${baseClass}__hit`} />
+        <circle r={node.radius + 4} className={`${baseClass}__halo`} />
+        <circle r={node.radius} className={`${baseClass}__core`} />
+        <text textAnchor="middle" dominantBaseline="central" className={`${baseClass}__glyph`}>
+          {getNodeInitials(node.name)}
         </text>
-      )}
+        {!hideLabel && (
+          <text y={node.radius + 24} textAnchor="middle" className={labelClassName}>
+            {truncateLabel(label, 14)}
+          </text>
+        )}
+      </g>
     </motion.g>
   );
 }
@@ -600,6 +630,7 @@ export default function ConnectionsGraph({
             searchHighlight={secondarySearchHighlight}
             motionTransition={nodeMotionTransition}
             instant={freeLayoutOn}
+            drift={freeLayoutOn && !prefersReducedMotion}
             onDrag={freeLayoutOn ? dragSecondary : undefined}
             onDragEnd={freeLayoutOn ? dragSecondaryEnd : undefined}
             hitPadding={touchTargets ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
@@ -665,6 +696,7 @@ export default function ConnectionsGraph({
             onArrow={moveInnerFocus}
             motionTransition={nodeMotionTransition}
             instant={freeLayoutOn}
+            drift={freeLayoutOn && !prefersReducedMotion}
             onDrag={freeLayoutOn ? dragInner : undefined}
             onDragEnd={freeLayoutOn ? dragInnerEnd : undefined}
             hitPadding={innerHitPadding}
@@ -682,6 +714,7 @@ export default function ConnectionsGraph({
           onArrow={moveInnerFocus}
           motionTransition={nodeMotionTransition}
           instant={freeLayoutOn}
+            drift={freeLayoutOn && !prefersReducedMotion}
           onDrag={freeLayoutOn ? dragYou : undefined}
           onDragEnd={freeLayoutOn ? dragYouEnd : undefined}
           hitPadding={innerHitPadding}

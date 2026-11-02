@@ -52,6 +52,9 @@ describe("ConnectionsGraph", () => {
       removeEventListener: jest.fn(),
     }));
 
+    // Free layout is the default now; most tests here assert the fixed ring, so pin it.
+    window.localStorage.setItem("intro_graph_layout", "fixed");
+
     container = document.createElement("div");
     document.body.appendChild(container);
   });
@@ -285,19 +288,46 @@ describe("ConnectionsGraph", () => {
     const transforms = () =>
       [...container.querySelectorAll(".connections__inner-node[tabindex]")].map((el) => el.style.transform);
 
-    it("is off by default", () => {
+    it("is on by default, so the graph moves without anyone finding a switch", () => {
+      window.localStorage.removeItem("intro_graph_layout");
+      renderGraph();
+      expect(toggle().getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("toggles off and on and remembers the choice", () => {
+      window.localStorage.removeItem("intro_graph_layout");
+      renderGraph();
+      act(() => toggle().click());
+      expect(toggle().getAttribute("aria-pressed")).toBe("false");
+      expect(window.localStorage.getItem("intro_graph_layout")).toBe("fixed");
+      act(() => toggle().click());
+      expect(toggle().getAttribute("aria-pressed")).toBe("true");
+      expect(window.localStorage.getItem("intro_graph_layout")).toBe("free");
+    });
+
+    it("stays off when the user chose the fixed layout", () => {
+      window.localStorage.setItem("intro_graph_layout", "fixed");
       renderGraph();
       expect(toggle().getAttribute("aria-pressed")).toBe("false");
     });
 
-    it("toggles on and off and remembers the choice", () => {
+    it("gives every node a gentle idle drift when on, and none when off", () => {
+      window.localStorage.setItem("intro_graph_layout", "free");
       renderGraph();
-      act(() => toggle().click());
-      expect(toggle().getAttribute("aria-pressed")).toBe("true");
-      expect(window.localStorage.getItem("intro_graph_layout")).toBe("free");
-      act(() => toggle().click());
-      expect(toggle().getAttribute("aria-pressed")).toBe("false");
-      expect(window.localStorage.getItem("intro_graph_layout")).toBe("fixed");
+      const nodes = container.querySelectorAll(".connections__inner-node[tabindex]");
+      const drifting = container.querySelectorAll(".connections__inner-node[tabindex] > .connections__node-body--drift");
+      expect(nodes.length).toBe(3);
+      expect(drifting.length).toBe(3);
+      // each node gets its own phase so they do not move in lockstep
+      const delays = new Set([...drifting].map((el) => el.style.getPropertyValue("--drift-delay")));
+      expect(delays.size).toBeGreaterThan(1);
+
+      document.body.removeChild(container);
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      window.localStorage.setItem("intro_graph_layout", "fixed");
+      renderGraph();
+      expect(container.querySelectorAll(".connections__node-body--drift")).toHaveLength(0);
     });
 
     it("starts on from a stored choice", () => {
@@ -318,6 +348,32 @@ describe("ConnectionsGraph", () => {
       window.history.pushState({}, "", "/?layout=fixed");
       renderGraph();
       expect(toggle().getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("captures the pointer when a node is pressed, so a fast drag keeps reaching it", () => {
+      // Real mouse input is hit-tested: without capture, moves that leave the node are delivered to
+      // whatever is under the cursor and the drag never starts (synthetic events hid this once).
+      const capture = jest.fn();
+      window.Element.prototype.setPointerCapture = capture;
+      window.localStorage.setItem("intro_graph_layout", "free");
+      renderGraph();
+      const node = container.querySelector(".connections__inner-node[tabindex]");
+      act(() => {
+        node.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+      });
+      expect(capture).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not capture the pointer when free layout is off", () => {
+      const capture = jest.fn();
+      window.Element.prototype.setPointerCapture = capture;
+      window.localStorage.setItem("intro_graph_layout", "fixed");
+      renderGraph();
+      const node = container.querySelector(".connections__inner-node[tabindex]");
+      act(() => {
+        node.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+      });
+      expect(capture).not.toHaveBeenCalled();
     });
 
     it("leaves a layout with no overlaps exactly on its rest positions", async () => {
