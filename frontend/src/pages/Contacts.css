@@ -48,7 +48,8 @@
 }
 
 .contacts__import-toggle-icon {
-  font-size: 0.7rem;
+  font-size: 0.9rem;
+  line-height: 1;
   color: var(--color-text-muted);
   transition: transform 0.25s ease;
 }
@@ -160,7 +161,8 @@
 
 /* ─── Content area ─── */
 .contacts__list-wrap {
-  overflow: hidden;
+  /* clip, not hidden: hidden makes this a scroll container, which breaks the sticky dial detail sheet */
+  overflow-x: clip;
   width: 100%;
 }
 
@@ -244,7 +246,7 @@
 .contact-card__phone {
   font-size: 0.8rem;
   color: var(--color-text-muted);
-  font-family: var(--font-mono, monospace);
+  font-variant-numeric: tabular-nums;
 }
 
 .contact-card__badge {
@@ -256,6 +258,11 @@
   color: var(--color-success);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+}
+
+/* Badges are direct children of the column-flex card too; keep them pill-sized, not full width */
+.contact-card > .contact-card__badge {
+  align-self: flex-start;
 }
 
 .contact-card__badge--muted {
@@ -361,6 +368,13 @@
 /* ─── Radial view ─── */
 .contacts__radial-view {
   width: 100%;
+}
+
+/* Beats RadialContactWheel.css `overflow: hidden` (which can load later), since hidden would also
+   break the sticky detail sheet */
+.contacts .contacts__radial-view {
+  overflow: visible;
+  overflow-x: clip;
 }
 
 /* ─── Desktop overrides ─── */

@@ -121,7 +121,14 @@ export default function Dashboard() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <h2 className="dashboard__actions-title">{t("dashboard.needsAttention")}</h2>
+              {/* Outgoing requests wait on other people; only incoming ones need the user */}
+              <h2 className="dashboard__actions-title">
+                {t(
+                  dash.actions.some((a) => a.id === "review_introductions")
+                    ? "dashboard.needsAttention"
+                    : "dashboard.inProgress"
+                )}
+              </h2>
               <ul className="dashboard__actions-list">
                 {dash.actions.map((a) => (
                   <li key={a.id}>
@@ -159,6 +166,10 @@ export default function Dashboard() {
             </ul>
           </motion.section>
 
+          <div className="dashboard__section-head">
+            <h2 className="dashboard__actions-title">{t("dashboard.networkTitle")}</h2>
+            <p className="dashboard__section-caption">{t("dashboard.windowCompare")}</p>
+          </div>
           <motion.ul
             className="dashboard__cards"
             variants={container}
@@ -176,7 +187,6 @@ export default function Dashboard() {
                     {replaceTpl(t("dashboard.newInWindow"), { n: card.kpi.comparison.window_current })}
                   </div>
                   <div className="dashboard-card__delta">{deltaLabel(card.kpi, t)}</div>
-                  <div className="dashboard-card__hint">{t("dashboard.windowCompare")}</div>
                 </div>
               </motion.li>
             ))}

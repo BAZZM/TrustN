@@ -1,7 +1,8 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence, MotionConfig } from "framer-motion";
 import { useApp } from "./context/AppContext";
+import usePreferenceAttributes from "./hooks/usePreferenceAttributes";
 import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -31,13 +32,20 @@ function AnimatedRoutes() {
 
 function App() {
   const { user } = useApp();
-  if (!user) return <Login />;
+  usePreferenceAttributes(user);
+  // "user": framer-motion drops transform/layout animations when the OS asks for reduced motion
   return (
-    <BrowserRouter>
-      <Layout>
-        <AnimatedRoutes />
-      </Layout>
-    </BrowserRouter>
+    <MotionConfig reducedMotion="user">
+      {!user ? (
+        <Login />
+      ) : (
+        <BrowserRouter>
+          <Layout>
+            <AnimatedRoutes />
+          </Layout>
+        </BrowserRouter>
+      )}
+    </MotionConfig>
   );
 }
 

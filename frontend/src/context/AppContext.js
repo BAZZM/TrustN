@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import axios from "axios";
+import { isSessionExpiredError } from "./sessionExpiry";
 
 const baseURL = process.env.REACT_APP_API_URL || "";
 
@@ -32,6 +33,17 @@ axios.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// A 401 on a data route means the stored token expired: AppProvider registers a handler that signs
+// out and shows a notice on the login screen, instead of every page showing a raw error.
+let handleSessionExpired = null;
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (handleSessionExpired && isSessionExpiredError(error)) handleSessionExpired();
+    return Promise.reject(error);
+  }
+);
+
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
@@ -54,10 +66,12 @@ export function AppProvider({ children }) {
   });
   const [locale, setLocaleState] = useState(() => localStorage.getItem("intro_locale") || "en");
   const [themesList, setThemesList] = useState([]);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   const setUser = useCallback((u, authToken) => {
     setUserState(u);
     if (u) {
+      setSessionExpired(false);
       localStorage.setItem("intro_user", JSON.stringify(u));
       if (authToken) {
         setTokenState(authToken);
@@ -74,6 +88,16 @@ export function AppProvider({ children }) {
     const t = localStorage.getItem("intro_token");
     if (t) setTokenState(t);
   }, []);
+
+  useEffect(() => {
+    handleSessionExpired = () => {
+      setUser(null);
+      setSessionExpired(true);
+    };
+    return () => {
+      handleSessionExpired = null;
+    };
+  }, [setUser]);
 
   const setTheme = useCallback((t) => {
     setThemeState(t || defaultTheme);
@@ -99,6 +123,7 @@ export function AppProvider({ children }) {
     setLocale,
     themesList,
     baseURL,
+    sessionExpired,
   };
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

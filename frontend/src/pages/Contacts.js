@@ -253,10 +253,11 @@ export default function Contacts() {
       </section>
 
       {/* View mode: Grid / List / Radial */}
-      <div className="contacts__view-mode">
+      <div className="contacts__view-mode" role="group" aria-label={t("contacts.viewModeLabel")}>
         <button
           type="button"
           className={`contacts__view-btn ${viewMode === VIEW_GRID ? "contacts__view-btn--active" : ""}`}
+          aria-pressed={viewMode === VIEW_GRID}
           onClick={() => setViewMode(VIEW_GRID)}
         >
           {t("contacts.viewGrid")}
@@ -264,6 +265,7 @@ export default function Contacts() {
         <button
           type="button"
           className={`contacts__view-btn ${viewMode === VIEW_LIST ? "contacts__view-btn--active" : ""}`}
+          aria-pressed={viewMode === VIEW_LIST}
           onClick={() => setViewMode(VIEW_LIST)}
         >
           {t("contacts.viewList")}
@@ -271,6 +273,7 @@ export default function Contacts() {
         <button
           type="button"
           className={`contacts__view-btn ${viewMode === VIEW_RADIAL ? "contacts__view-btn--active" : ""}`}
+          aria-pressed={viewMode === VIEW_RADIAL}
           onClick={() => setViewMode(VIEW_RADIAL)}
         >
           {t("contacts.viewRadial")}
@@ -278,7 +281,9 @@ export default function Contacts() {
       </div>
 
       <section className="contacts__list-wrap">
-        {viewMode === VIEW_RADIAL && (
+        {/* One loading line for every view; the radial view would otherwise flash its "no contacts" empty state */}
+        {loading && <p className="contacts__loading">{t("contacts.loading")}</p>}
+        {viewMode === VIEW_RADIAL && !loading && (
           <div className="contacts__radial-view">
             <DialContactScreen
               innerConnections={innerConnections}
@@ -328,7 +333,6 @@ export default function Contacts() {
         {(viewMode === VIEW_GRID || viewMode === VIEW_LIST) && (
           <>
             <h2 className="contacts__section-title">{t("contacts.yourContacts")}</h2>
-            {loading && <p className="contacts__loading">Loading…</p>}
             {!loading && loadError && (
               <div className="contacts__empty contacts__empty--error" role="alert">
                 <p>{t("contacts.loadError")}</p>
@@ -368,7 +372,7 @@ export default function Contacts() {
                     </div>
                     {c.user_id && (
                       <div className="contact-card__meta">
-                        {c.user_name} · {c.job_role}
+                        {[c.user_name !== c.contact_name && c.user_name, c.job_role].filter(Boolean).join(" · ")}
                       </div>
                     )}
                     {c.user_id && !connectedPeerIds.has(c.user_id) && (

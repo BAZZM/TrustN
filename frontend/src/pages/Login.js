@@ -38,7 +38,7 @@ function getApiErrorMessage(data) {
 }
 
 export default function Login() {
-  const { setUser, theme, locale, baseURL } = useApp();
+  const { setUser, theme, locale, baseURL, sessionExpired } = useApp();
   const t = useTranslations(locale);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -61,7 +61,10 @@ export default function Login() {
   function handlePhoneSubmit(e) {
     e.preventDefault();
     setError(null);
-    if (!phone.trim()) return;
+    if (!phone.trim()) {
+      setError(t("login.phoneRequired"));
+      return;
+    }
     setLoading(true);
     axios
       .post(baseURL + "/api/auth/identify", { phone: phone.trim() })
@@ -183,6 +186,11 @@ export default function Login() {
       >
         <h1 className="login__title">{t("login.title")}</h1>
         <p className="login__subtitle">{t("login.subtitle")}</p>
+        {sessionExpired && step === STEP_PHONE && (
+          <p className="login__notice" role="status">
+            {t("login.sessionExpired")}
+          </p>
+        )}
 
         <AnimatePresence mode="wait">
           {step === STEP_PHONE && (
@@ -206,7 +214,7 @@ export default function Login() {
                 disabled={loading}
                 aria-label={t("login.phonePlaceholder")}
               />
-              {error && <p className="login__error">{error}</p>}
+              {error && <p className="login__error" role="alert">{error}</p>}
               <motion.button
                 type="submit"
                 className="login__btn"
@@ -246,7 +254,7 @@ export default function Login() {
                 disabled={loading}
                 aria-label="Verification code"
               />
-              {error && <p className="login__error">{error}</p>}
+              {error && <p className="login__error" role="alert">{error}</p>}
               <motion.button
                 type="submit"
                 className="login__btn"
@@ -312,7 +320,7 @@ export default function Login() {
                 onChange={(e) => setRegisterData((p) => ({ ...p, experience: e.target.value }))}
                 disabled={loading}
               />
-              {error && <p className="login__error">{error}</p>}
+              {error && <p className="login__error" role="alert">{error}</p>}
               <motion.button
                 type="submit"
                 className="login__btn"

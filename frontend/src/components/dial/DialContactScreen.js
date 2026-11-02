@@ -55,6 +55,7 @@ function ContactChip({ contact, isSelected, onClick, circle, extraClassName = ""
       type="button"
       className={`dial-chip ${isSelected ? "dial-chip--selected" : ""} dial-chip--${circle} ${extraClassName}`.trim()}
       onClick={onClick}
+      aria-pressed={isSelected}
       whileTap={{ scale: 0.95 }}
       layout
     >

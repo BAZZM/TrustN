@@ -3,7 +3,10 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import { useApp } from "../context/AppContext";
 import { useTranslations } from "../i18n";
+import ToggleRow from "../components/ToggleRow";
 import "./Settings.css";
+
+const STATUS_DISMISS_MS = 3000;
 
 export default function Settings() {
   const { user, setUser, token, theme, setTheme, locale, setLocale, themesList, baseURL } = useApp();
@@ -30,6 +33,17 @@ export default function Settings() {
     }
   }, [user]);
 
+  // Success toasts clear themselves; errors stay until the next action.
+  useEffect(() => {
+    if (status?.type !== "success") return undefined;
+    const tid = window.setTimeout(() => setStatus(null), STATUS_DISMISS_MS);
+    return () => window.clearTimeout(tid);
+  }, [status]);
+
+  // The stored default theme has no id, so fall back to the saved preference, then to a slug match.
+  const activeThemeId =
+    theme?.id ?? user?.theme_id ?? themesList.find((x) => x.slug === theme?.slug)?.id ?? null;
+
   function updatePref(key, value) {
     if (!user || !user.id) return;
     setSaving(true);
@@ -37,10 +51,10 @@ export default function Settings() {
     const payload = { [key]: value };
     axios.patch(baseURL + "/api/profile", payload).then(function(r) {
       setUser({ ...user, ...r.data }, token);
-      setStatus({ type: "success", message: "Settings saved." });
+      setStatus({ type: "success", message: t("settings.saved") });
       setSaving(false);
     }).catch(function(err) {
-      setStatus({ type: "error", message: err.response?.data?.error || "Could not save settings." });
+      setStatus({ type: "error", message: err.response?.data?.error || t("settings.saveError") });
       setSaving(false);
     });
   }
@@ -70,15 +84,20 @@ export default function Settings() {
   function handleProfileSave(e) {
     e.preventDefault();
     if (!user?.id || profileSaving) return;
+    const name = profile.name.trim();
+    if (!name) {
+      setStatus({ type: "error", message: t("settings.nameRequired") });
+      return;
+    }
     setProfileSaving(true);
     setStatus(null);
-    axios.patch(baseURL + "/api/profile", profile)
+    axios.patch(baseURL + "/api/profile", { ...profile, name })
       .then(function(r) {
         setUser({ ...user, ...r.data }, token);
-        setStatus({ type: "success", message: "Profile saved." });
+        setStatus({ type: "success", message: t("settings.profileSaved") });
       })
       .catch(function(err) {
-        setStatus({ type: "error", message: err.response?.data?.error || "Could not save profile." });
+        setStatus({ type: "error", message: err.response?.data?.error || t("settings.profileSaveError") });
       })
       .finally(function() { setProfileSaving(false); });
   }
@@ -87,22 +106,25 @@ export default function Settings() {
     <motion.div className="page settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
       <motion.header className="settings__header" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
         <h1 className="settings__title">{t("settings.title")}</h1>
-        <p className="settings__subtitle">{t("settings.profile")}</p>
+        <p className="settings__subtitle">{t("settings.subtitle")}</p>
       </motion.header>
 
-      {status && (
-        <div
-          className={`settings__status settings__status--${status.type}`}
-          role={status.type === "error" ? "alert" : "status"}
-        >
-          {status.message}
-        </div>
-      )}
+      {/* Fixed above the nav so feedback shows next to whatever control was used, not at the page top */}
+      <div className="settings__toast-region" aria-live="polite">
+        {status && (
+          <div
+            className={`settings__status settings__status--${status.type}`}
+            role={status.type === "error" ? "alert" : undefined}
+          >
+            {status.message}
+          </div>
+        )}
+      </div>
 
       <motion.div className="settings__sections" initial="hidden" animate="show" variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06, delayChildren: 0.08 } } }}>
         <motion.section className="settings-section" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
-          <h2 className="settings-section__title">Profile</h2>
-          <form onSubmit={handleProfileSave} className="settings-profile-form">
+          <h2 className="settings-section__title">{t("settings.profile")}</h2>
+          <form onSubmit={handleProfileSave} className="settings-profile-form" noValidate>
             <div className="settings-profile-form__row">
               <label htmlFor="profile-name" className="settings-profile-form__label">Name</label>
               <input
@@ -112,6 +134,9 @@ export default function Settings() {
                 value={profile.name}
                 onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
                 placeholder="Your name"
+                required
+                aria-required="true"
+                autoComplete="name"
               />
             </div>
             <div className="settings-profile-form__row">
@@ -161,7 +186,7 @@ export default function Settings() {
                 <li key={th.id}>
                   <motion.button type="button" className="settings-row" whileHover={{ x: 4 }} whileTap={{ scale: 0.99 }} onClick={function() { handleTheme(th.id); }}>
                     <span>{th.name}</span>
-                    {theme && theme.id === th.id ? <span className="settings-row__check">✓</span> : <span className="settings-row__arrow">→</span>}
+                    {activeThemeId === th.id ? <span className="settings-row__check" aria-label={t("settings.current")}>✓</span> : <span className="settings-row__arrow" aria-hidden="true">→</span>}
                   </motion.button>
                 </li>
               );
@@ -187,36 +212,27 @@ export default function Settings() {
         </motion.section>
 
         <motion.section className="settings-section" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
-          <h2 className="settings-section__title">Accessibility</h2>
+          <h2 className="settings-section__title">{t("settings.accessibility")}</h2>
           <ul className="settings-section__list">
             <li>
-              <div className="settings-row settings-row--toggle">
-                <span>{t("settings.largeText")}</span>
-                <button type="button" className={"toggle " + (largeText ? "toggle--on" : "")} onClick={function() { handleLargeText(!largeText); }} aria-pressed={largeText} />
-              </div>
+              <ToggleRow label={t("settings.largeText")} checked={largeText} onChange={handleLargeText} />
             </li>
             <li>
-              <div className="settings-row settings-row--toggle">
-                <span>{t("settings.highContrast")}</span>
-                <button type="button" className={"toggle " + (highContrast ? "toggle--on" : "")} onClick={function() { handleHighContrast(!highContrast); }} aria-pressed={highContrast} />
-              </div>
+              <ToggleRow label={t("settings.highContrast")} checked={highContrast} onChange={handleHighContrast} />
             </li>
           </ul>
         </motion.section>
 
         <motion.section className="settings-section" variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
-          <h2 className="settings-section__title">Notifications</h2>
+          <h2 className="settings-section__title">{t("settings.notificationsTitle")}</h2>
           <ul className="settings-section__list">
             <li>
-              <div className="settings-row settings-row--toggle">
-                <span>{t("settings.notifications")}</span>
-                <button type="button" className={"toggle " + (notifications ? "toggle--on" : "")} onClick={function() { handleNotifications(!notifications); }} aria-pressed={notifications} />
-              </div>
+              <ToggleRow label={t("settings.notifications")} checked={notifications} onChange={handleNotifications} />
             </li>
           </ul>
         </motion.section>
       </motion.div>
-      {saving && <p className="settings__saving">Saving…</p>}
+      {saving && <p className="settings__saving">{t("settings.saving")}</p>}
     </motion.div>
   );
 }

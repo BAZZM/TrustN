@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useApp } from "../context/AppContext";
@@ -19,6 +19,11 @@ export default function Layout({ children }) {
   // The full-bleed Connections shell applies at every width; wide screens centre its contents in CSS.
   const immersiveGraphRoute = location.pathname === "/connections";
 
+  // A new page starts at the top; without this it opens at the previous page's scroll offset.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   return (
     <div className={"app" + (immersiveGraphRoute ? " app--immersive-graph" : "")}>
       <header className="layout-header">
@@ -37,13 +42,7 @@ export default function Layout({ children }) {
         </motion.div>
       </header>
 
-      <main
-        className={
-          "app__main " +
-          (location.pathname === "/" ? "app__main--black " : "") +
-          (immersiveGraphRoute ? "app__main--immersive-graph" : "")
-        }
-      >
+      <main className={"app__main" + (immersiveGraphRoute ? " app__main--immersive-graph" : "")}>
         {children}
       </main>
 

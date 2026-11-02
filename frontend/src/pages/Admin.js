@@ -13,11 +13,13 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(null);
+  const [forbidden, setForbidden] = useState(false);
 
   const loadAdminData = useCallback(() => {
     if (!user?.id || !token) return;
     setLoading(true);
     setError(null);
+    setForbidden(false);
     Promise.all([
         axios.get(baseURL + "/api/admin/config"),
         axios.get(baseURL + "/api/admin/system-health"),
@@ -27,7 +29,9 @@ export default function Admin() {
         setHealth(healthRes.data);
       })
       .catch((err) => {
-        setError(err.response?.status === 403 ? "Admin access required" : err.response?.data?.error || "Failed to load");
+        // A 403 is an expected answer for non-admins, not a failure worth retrying.
+        if (err.response?.status === 403) setForbidden(true);
+        else setError(err.response?.data?.error || "Failed to load");
         setConfig([]);
         setHealth(null);
       })
@@ -88,6 +92,13 @@ export default function Admin() {
         </div>
       )}
 
+      {forbidden && (
+        <section className="admin__section admin__empty">
+          <h2 className="admin__section-title">{t("admin.forbiddenTitle")}</h2>
+          <p>{t("admin.forbiddenBody")}</p>
+        </section>
+      )}
+
       {loading && <p className="admin__loading">Loading…</p>}
 
       {!loading && health && !error && (
@@ -122,7 +133,7 @@ export default function Admin() {
         </motion.section>
       )}
 
-      {!loading && config.length === 0 && !error && (
+      {!loading && config.length === 0 && !error && !forbidden && (
         <section className="admin__section admin__empty">
           <h2 className="admin__section-title">{t("admin.noConfigTitle")}</h2>
           <p>{t("admin.noConfigBody")}</p>

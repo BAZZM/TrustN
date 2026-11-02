@@ -46,6 +46,19 @@
   --hud-border: rgba(255, 255, 255, 0.08);
   --sheet-surface: rgba(12, 14, 22, 0.82);
   --floating-nav-clearance: calc(76px + var(--safe-bottom));
+
+  /* Fixed bottom nav height + safe area; pages pad by this so the nav never covers content */
+  --nav-clearance: calc(72px + var(--safe-bottom));
+
+  /* Controls that need 3:1 against the surface (WCAG 1.4.11) */
+  --color-control-off: rgba(255, 255, 255, 0.22);
+  --color-control-thumb: #fff;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --nav-clearance: calc(84px + var(--safe-bottom));
+  }
 }
 
 * {
@@ -73,6 +86,20 @@ body {
   flex-direction: column;
 }
 
+/* Form controls default to the UA font (Arial); keep them on the brand family */
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* One visible keyboard focus style for every control (mouse clicks don't trigger :focus-visible) */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --transition-fast: 0.01ms;
@@ -81,9 +108,10 @@ body {
   }
 }
 
-/* Profile: large text (accessibility) */
-[data-large-text="true"] body {
-  font-size: 18px;
+/* Profile: large text (accessibility). Set on <html> by usePreferenceAttributes; scaling the root
+   size scales every rem-based size, not just body copy. */
+html[data-large-text="true"] {
+  font-size: 112.5%;
 }
 
 [data-large-text="true"] .dashboard__title,
@@ -95,8 +123,9 @@ body {
 
 /* Profile: high contrast */
 [data-high-contrast="true"] {
-  --color-border: rgba(255, 255, 255, 0.15);
-  --color-text-muted: #bbb;
+  --color-border: rgba(255, 255, 255, 0.28);
+  --color-text-muted: #c8c8c8;
+  --color-control-off: rgba(255, 255, 255, 0.4);
 }
 
 /* Utility */

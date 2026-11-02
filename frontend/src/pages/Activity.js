@@ -4,6 +4,7 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { useApp } from "../context/AppContext";
 import { useTranslations } from "../i18n";
+import { buildActivityEvents } from "./activityEvents";
 import "./Activity.css";
 
 const container = {
@@ -18,39 +19,6 @@ const item = {
   hidden: { opacity: 0, y: 10 },
   show: { opacity: 1, y: 0 },
 };
-
-function formatTime(value) {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function buildRequestText(request, currentUserId, t) {
-  const isOutbound = String(request.requester_id) === String(currentUserId);
-  const isSecondary = request.circle_type === "secondary" && request.intermediary_id;
-
-  if (isOutbound) {
-    return isSecondary
-      ? t("activity.sentSecondary")
-          .replace("{target}", request.target_name || "—")
-          .replace("{intermediary}", request.intermediary_name || "—")
-      : t("activity.sentInner").replace("{target}", request.target_name || "—");
-  }
-
-  if (isSecondary && String(request.intermediary_id) === String(currentUserId)) {
-    return t("activity.needsVouch")
-      .replace("{requester}", request.requester_name || "—")
-      .replace("{target}", request.target_name || "—");
-  }
-
-  return t("activity.needsResponse").replace("{requester}", request.requester_name || "—");
-}
 
 export default function Activity() {
   const { user, baseURL } = useApp();
@@ -82,7 +50,8 @@ export default function Activity() {
         setInbox([]);
         setSent([]);
         setDashboard(null);
-        setError(err.response?.data?.error || "Could not load activity.");
+        // Empty string = failed with no server message; the copy is translated at render time.
+        setError(err.response?.data?.error || "");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -93,36 +62,16 @@ export default function Activity() {
     };
   }, [baseURL, user?.id]);
 
-  const events = useMemo(() => {
-    const requestEvents = [...inbox, ...sent]
-      .sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0))
-      .slice(0, 8)
-      .map((request) => ({
-        id: `request-${request.id}`,
-        type: inbox.some((item) => item.id === request.id) ? "attention" : "sent",
-        text: buildRequestText(request, user?.id, t),
-        time: formatTime(request.created_at),
-        href: "/connections",
-      }));
+  const events = useMemo(
+    () => buildActivityEvents({ inbox, sent, dashboard, currentUserId: user?.id, t }),
+    [dashboard, inbox, sent, t, user?.id]
+  );
 
-    if (dashboard) {
-      requestEvents.push({
-        id: "snapshot",
-        type: "system",
-        text: t("activity.snapshot")
-          .replace("{inner}", String(dashboard.kpis?.inner?.total ?? 0))
-          .replace("{secondary}", String(dashboard.kpis?.secondary?.total ?? 0)),
-        time: formatTime(dashboard.computed_at),
-        href: "/",
-      });
-    }
-
-    return requestEvents;
-  }, [dashboard, inbox, sent, t, user?.id]);
-
+  // While loading, show a placeholder rather than zeros that read as real counts.
+  const pending = loading ? "—" : null;
   const summary = [
-    { key: "inbox", value: inbox.length, label: t("activity.summaryInbox"), href: "/connections" },
-    { key: "sent", value: sent.length, label: t("activity.summarySent"), href: "/connections" },
+    { key: "inbox", value: pending ?? inbox.length, label: t("activity.summaryInbox"), href: "/connections" },
+    { key: "sent", value: pending ?? sent.length, label: t("activity.summarySent"), href: "/connections" },
     {
       key: "network",
       value: dashboard?.kpis?.inner?.total ?? "—",
@@ -145,7 +94,7 @@ export default function Activity() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35 }}
       >
-        <h1 className="activity__title">Activity</h1>
+        <h1 className="activity__title">{t("activity.title")}</h1>
         <p className="activity__subtitle">{t("activity.subtitle")}</p>
       </motion.header>
 
@@ -161,13 +110,13 @@ export default function Activity() {
       </motion.ul>
 
       {loading && <p className="activity__state">{t("activity.loading")}</p>}
-      {error && (
+      {error !== null && (
         <div className="activity__state activity__state--error" role="alert">
-          {error}
+          {error || t("activity.loadError")}
         </div>
       )}
 
-      {!loading && !error && events.length === 0 && (
+      {!loading && error === null && events.length === 0 && (
         <section className="activity__empty">
           <h2>{t("activity.emptyTitle")}</h2>
           <p>{t("activity.emptyBody")}</p>
