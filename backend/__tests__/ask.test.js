@@ -97,6 +97,38 @@ describe('POST /api/connections/ask', () => {
     expect(res.body.results.find((r) => r.id === inner.id).path).toEqual({ kind: 'direct_inner', via: null });
   });
 
+  test('a synonym finds people the typed word alone would miss, without losing the typed word', async () => {
+    const viewer = await createUser({ name: 'Viewer' });
+    const bridge = await createUser({ name: 'Bridge', job_role: 'Clerk', industry: 'Admin' });
+    const engineer = await createUser({ name: 'Backend Dev', job_role: 'Backend Engineer', industry: 'Retail' });
+    const literal = await createUser({ name: 'Soft Manager', job_role: 'Manager', industry: 'Software' });
+    await createInnerConnection(viewer.id, bridge.id);
+    await createInnerConnection(bridge.id, engineer.id);
+    await createInnerConnection(bridge.id, literal.id);
+
+    const res = await ask(viewer.id, 'anyone in software?');
+
+    expect(res.status).toBe(200);
+    expect(res.body.interpretation.terms).toEqual(['software']);
+    const ids = res.body.results.map((r) => r.id);
+    expect(ids).toContain(engineer.id); // matched through the synonym "engineer"
+    expect(ids).toContain(literal.id); // matched by the literal word "software"
+  });
+
+  test('understands accented words', async () => {
+    const viewer = await createUser({ name: 'Viewer' });
+    const bridge = await createUser({ name: 'Bridge', job_role: 'Clerk', industry: 'Admin' });
+    const target = await createUser({ name: 'Zoe', job_role: 'Médecin', industry: 'Santé' });
+    await createInnerConnection(viewer.id, bridge.id);
+    await createInnerConnection(bridge.id, target.id);
+
+    const res = await ask(viewer.id, 'un médecin?');
+
+    expect(res.status).toBe(200);
+    expect(res.body.interpretation.terms).toEqual(['médecin']);
+    expect(res.body.results.map((r) => r.id)).toContain(target.id);
+  });
+
   test('flags a direct secondary link that has no introducer', async () => {
     const viewer = await createUser({ name: 'Viewer' });
     const edgePal = await createUser({ name: 'Edge Pal', job_role: 'Painter', industry: 'Art' });

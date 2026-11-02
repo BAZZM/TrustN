@@ -5,29 +5,60 @@
  * Candidate: { id, name, job_role, industry, experience, kind: 'inner'|'secondary', strength,
  *              direct, via: number[], primary_via: number|null, ftsTerms?: string[] }
  * `experience` (bio text) is used only for matching and is never returned.
+ *
+ * Matching is by word start, not raw substring: "art" matches "Art Director" but not "smart" or
+ * "partner", and "designers" (stemmed to "design") matches "Design Lead".
  */
 
 const { stem } = require('./askInterpret');
 
 const FIELD_WEIGHT = { job_role: 1.0, industry: 0.8, experience: 0.5, name: 0.3 };
-const FTS_ONLY_WEIGHT = 0.5; // matched by full-text search but not by plain substring
+const FTS_ONLY_WEIGHT = 0.5; // matched by full-text search but not by word-start matching
 const MAX_RESULTS = 12;
+const MIN_STEM_LENGTH = 4; // shorter stems ("wat" from "water") match unrelated words
 
 function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+// Compiled patterns are cached, but words come from user questions: bound the cache so a long-lived
+// server cannot be made to grow without limit by asking about many distinct words.
+const MAX_PATTERN_CACHE = 500;
+const wordStartCache = new Map();
+function wordStartPattern(word) {
+  let re = wordStartCache.get(word);
+  if (!re) {
+    if (wordStartCache.size >= MAX_PATTERN_CACHE) wordStartCache.clear();
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    re = new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}`, 'u');
+    wordStartCache.set(word, re);
+  }
+  return re;
+}
+
+/** The term as typed, its stem (when long enough to be safe), and any synonyms (and their stems). */
+function variantsOf(term, synonyms) {
+  const out = new Set();
+  for (const word of [term, ...((synonyms && synonyms[term]) || [])]) {
+    out.add(word);
+    const stemmed = stem(word);
+    if (stemmed !== word && stemmed.length >= MIN_STEM_LENGTH) out.add(stemmed);
+  }
+  return [...out];
+}
+
 /** Which terms hit which fields, and the best field weight per term. */
-function matchCandidate(candidate, terms) {
+function matchCandidate(candidate, terms, synonyms = {}) {
   const matchedTerms = new Map(); // term -> best weight
   const matchedFields = new Set();
   const fts = new Set(candidate.ftsTerms || []);
 
   for (const term of terms) {
+    const variants = variantsOf(term, synonyms);
     let best = 0;
     for (const field of Object.keys(FIELD_WEIGHT)) {
       const text = String(candidate[field] || '').toLowerCase();
-      if (text && (text.includes(term) || text.includes(stem(term)))) {
+      if (text && variants.some((v) => wordStartPattern(v).test(text))) {
         matchedFields.add(field);
         best = Math.max(best, FIELD_WEIGHT[field]);
       }
@@ -41,8 +72,8 @@ function matchCandidate(candidate, terms) {
   return { matchedTerms, matchedFields };
 }
 
-function scoreCandidate(candidate, terms) {
-  const { matchedTerms, matchedFields } = matchCandidate(candidate, terms);
+function scoreCandidate(candidate, terms, synonyms = {}) {
+  const { matchedTerms, matchedFields } = matchCandidate(candidate, terms, synonyms);
   if (matchedTerms.size === 0 || terms.length === 0) return null;
 
   const coverage = matchedTerms.size / terms.length;
@@ -81,11 +112,12 @@ function buildReason(matchedTerms, path) {
  * @param candidates see top of file
  * @param terms interpreted search terms
  * @param innerNameById Map<number, string> of the viewer's inner peers (for path names)
+ * @param options { limit?: number, synonyms?: Object<string, string[]> }
  */
-function rankCandidates(candidates, terms, innerNameById = new Map(), limit = MAX_RESULTS) {
+function rankCandidates(candidates, terms, innerNameById = new Map(), { limit = MAX_RESULTS, synonyms = {} } = {}) {
   const scored = [];
   for (const candidate of candidates) {
-    const result = scoreCandidate(candidate, terms);
+    const result = scoreCandidate(candidate, terms, synonyms);
     if (!result) continue;
     const path = buildPath(candidate, innerNameById);
     scored.push({
@@ -109,4 +141,13 @@ function rankCandidates(candidates, terms, innerNameById = new Map(), limit = MA
   return scored.slice(0, limit);
 }
 
-module.exports = { rankCandidates, scoreCandidate, matchCandidate, buildReason, FIELD_WEIGHT, MAX_RESULTS };
+module.exports = {
+  rankCandidates,
+  scoreCandidate,
+  matchCandidate,
+  buildReason,
+  patternCacheSize: () => wordStartCache.size,
+  FIELD_WEIGHT,
+  MAX_RESULTS,
+  MAX_PATTERN_CACHE,
+};

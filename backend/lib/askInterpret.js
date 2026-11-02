@@ -4,6 +4,10 @@
  * Default is deterministic rules (no key, no network). An optional model call can improve
  * interpretation when ASK_LLM=1 and ANTHROPIC_API_KEY are set; it receives only the question text
  * (never anyone's profile) and its output is validated, falling back to the rules on any problem.
+ *
+ * Result shape: { mode, terms: string[], synonyms: { [term]: string[] } }. A synonym is an
+ * *alternative* spelling of the same term (it is searched and matched in addition to the word the
+ * user typed, never instead of it).
  */
 
 const MAX_TERMS = 6;
@@ -15,13 +19,13 @@ const STOPWORDS = new Set([
   'people', 'person', 'any', 'the', 'and', 'for', 'with', 'has', 'have', 'had', 'are', 'was', 'were',
   'been', 'being', 'that', 'this', 'those', 'these', 'from', 'into', 'about', 'find', 'show', 'tell',
   'give', 'need', 'want', 'looking', 'look', 'work', 'works', 'working', 'worked', 'there', 'their',
-  'them', 'they', 'but', 'not', 'all', 'some', 'who', 'our', 'out', 'also', 'than', 'then', 'very',
-  'just', 'like', 'get', 'got', 'one', 'ones', 'its', "it's", 'his', 'her', 'she', 'him', 'may',
-  'might', 'must', 'will', 'shall', 'much', 'many', 'more', 'most', 'other', 'such', 'only', 'own',
-  'same', 'too', 'use', 'used', 'over', 'under', 'between', 'through', 'during', 'before', 'after',
+  'them', 'they', 'but', 'not', 'all', 'some', 'our', 'out', 'also', 'than', 'then', 'very', 'just',
+  'like', 'get', 'got', 'one', 'ones', 'its', 'his', 'her', 'she', 'him', 'may', 'might', 'must',
+  'will', 'shall', 'much', 'many', 'more', 'most', 'other', 'such', 'only', 'own', 'same', 'too',
+  'use', 'used', 'over', 'under', 'between', 'through', 'during', 'before', 'after',
 ]);
 
-// A handful of everyday job words mapped onto the vocabulary profiles actually use.
+// A handful of everyday words and the profile vocabulary they usually mean.
 const SYNONYMS = {
   doctor: 'healthcare',
   doctors: 'healthcare',
@@ -37,15 +41,14 @@ const SYNONYMS = {
   programmer: 'engineer',
   coder: 'engineer',
   software: 'engineer',
-  finance: 'finance',
   banker: 'finance',
   accountant: 'finance',
 };
 
 /**
- * Very light stemming so "designers" and "design" meet. Used only for substring matching in askRank:
- * terms sent to Postgres full-text search stay as written, because Postgres stems on its own and a
- * second, cruder stem ("painter" -> "paint") would stop matching what it indexed.
+ * Very light stemming so "designers" and "design" meet. Used only for matching in askRank: terms
+ * sent to Postgres full-text search stay as written, because Postgres stems on its own and a
+ * second, cruder stem would stop matching what it indexed.
  */
 function stem(word) {
   let w = word;
@@ -57,23 +60,26 @@ function stem(word) {
   return w;
 }
 
+const charCount = (s) => Array.from(s).length;
+
 function interpretRules(question) {
   const tokens = String(question || '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
+    .normalize('NFC')
+    // Keep letters and digits in any script (so "médecin" and "Zürich" survive); drop punctuation.
+    .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
     .split(/[\s-]+/)
-    .filter((t) => t.length >= 3 && !STOPWORDS.has(t));
+    .filter((t) => charCount(t) >= 3 && !STOPWORDS.has(t));
 
-  const seen = new Set();
   const terms = [];
+  const synonyms = {};
   for (const token of tokens) {
-    const term = SYNONYMS[token] || token;
-    if (seen.has(term)) continue;
-    seen.add(term);
-    terms.push(term);
+    if (terms.includes(token)) continue;
+    terms.push(token);
+    if (SYNONYMS[token] && SYNONYMS[token] !== token) synonyms[token] = [SYNONYMS[token]];
     if (terms.length >= MAX_TERMS) break;
   }
-  return { mode: 'rules', terms };
+  return { mode: 'rules', terms, synonyms };
 }
 
 /** Accept only short, plain-letter terms from the model; anything else is rejected outright. */
@@ -83,7 +89,7 @@ function validateTerms(value) {
   for (const raw of value) {
     if (typeof raw !== 'string') return null;
     const term = raw.trim().toLowerCase();
-    if (!/^[a-z]{3,32}$/.test(term)) return null;
+    if (!/^\p{L}{3,32}$/u.test(term)) return null;
     if (!clean.includes(term)) clean.push(term);
   }
   if (clean.length === 0 || clean.length > MAX_TERMS) return null;
@@ -116,7 +122,7 @@ async function interpretLlm(question, { apiKey, fetchImpl, model = 'claude-haiku
     const text = body && body.content && body.content[0] && body.content[0].text;
     const parsed = JSON.parse(text);
     const terms = validateTerms(parsed && parsed.terms);
-    return terms ? { mode: 'llm', terms } : null;
+    return terms ? { mode: 'llm', terms, synonyms: {} } : null;
   } catch (_) {
     return null;
   } finally {
@@ -125,7 +131,7 @@ async function interpretLlm(question, { apiKey, fetchImpl, model = 'claude-haiku
 }
 
 /**
- * @returns {Promise<{ mode: 'rules'|'llm', terms: string[] }>}
+ * @returns {Promise<{ mode: 'rules'|'llm', terms: string[], synonyms: Object<string, string[]> }>}
  */
 async function interpret(question, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
   if (env.ASK_LLM === '1' && env.ANTHROPIC_API_KEY && typeof fetchImpl === 'function') {

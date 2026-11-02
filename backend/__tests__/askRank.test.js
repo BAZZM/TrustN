@@ -1,4 +1,4 @@
-const { rankCandidates, scoreCandidate } = require('../lib/askRank');
+const { rankCandidates, scoreCandidate, patternCacheSize, MAX_PATTERN_CACHE } = require('../lib/askRank');
 
 const innerNames = new Map([
   [10, 'Henry Harris'],
@@ -33,18 +33,56 @@ describe('scoreCandidate', () => {
     expect(bio.score).toBeGreaterThan(name.score);
   });
 
-  test('a full-text hit that is not a substring still counts, as a "profile" match', () => {
+  test('a full-text hit that is not a word-start match still counts, as a "profile" match', () => {
     const r = scoreCandidate(cand({ job_role: 'Builder', ftsTerms: ['design'] }), ['design']);
     expect(r).not.toBeNull();
     expect(r.matchedFields).toEqual(['profile']);
   });
 
-  test('matches on the stem, so "designers" finds "Design Lead"', () => {
+  test('matches on the stem, so "designers" finds "Design Lead" and "engineering" finds "Software Engineer"', () => {
     expect(scoreCandidate(cand({ job_role: 'Design Lead' }), ['designers'])).not.toBeNull();
+    expect(scoreCandidate(cand({ job_role: 'Software Engineer' }), ['engineering'])).not.toBeNull();
+  });
+
+  test('matches whole words by their start, not raw substrings', () => {
+    expect(scoreCandidate(cand({ job_role: 'Smart Cities Lead' }), ['art'])).toBeNull();
+    expect(scoreCandidate(cand({ industry: 'Partnerships' }), ['art'])).toBeNull();
+    expect(scoreCandidate(cand({ job_role: 'Art Director' }), ['art'])).not.toBeNull();
+    expect(scoreCandidate(cand({ job_role: 'Outlaw Tours Guide' }), ['law'])).toBeNull();
+  });
+
+  test('does not let a short stem match unrelated words ("water" must not match "watch")', () => {
+    expect(scoreCandidate(cand({ job_role: 'Watch Repairer' }), ['water'])).toBeNull();
+    expect(scoreCandidate(cand({ job_role: 'Water Engineer' }), ['water'])).not.toBeNull();
+    expect(scoreCandidate(cand({ experience: 'a papa of three' }), ['paper'])).toBeNull();
+  });
+
+  test('a synonym counts as a hit for its term, alongside the word as typed', () => {
+    const synonyms = { software: ['engineer'] };
+    // matches by synonym
+    expect(scoreCandidate(cand({ job_role: 'Backend Engineer' }), ['software'], synonyms)).not.toBeNull();
+    // matches by the literal word the user typed (the old behavior would have lost this)
+    expect(scoreCandidate(cand({ job_role: 'Manager', industry: 'Software' }), ['software'], synonyms)).not.toBeNull();
+    expect(scoreCandidate(cand({ job_role: 'Plumber' }), ['software'], synonyms)).toBeNull();
+  });
+
+  test('matches accented and non-Latin text', () => {
+    expect(scoreCandidate(cand({ job_role: 'Médecin généraliste' }), ['médecin'])).not.toBeNull();
+    expect(scoreCandidate(cand({ industry: 'Zürich Finance' }), ['zürich'])).not.toBeNull();
   });
 
   test('is case-insensitive', () => {
     expect(scoreCandidate(cand({ industry: 'HEALTHCARE' }), ['healthcare'])).not.toBeNull();
+  });
+});
+
+describe('pattern cache', () => {
+  test('stays bounded however many distinct words are asked about', () => {
+    const c = cand({ job_role: 'Designer' });
+    for (let i = 0; i < MAX_PATTERN_CACHE * 3; i += 1) scoreCandidate(c, [`unique${i}word`]);
+    expect(patternCacheSize()).toBeLessThanOrEqual(MAX_PATTERN_CACHE);
+    // and matching still works after the cache has been cleared
+    expect(scoreCandidate(c, ['design'])).not.toBeNull();
   });
 });
 
@@ -99,11 +137,11 @@ describe('rankCandidates', () => {
     expect(edge.reason).toBe('Matches design. You have a direct link but no introducer.');
   });
 
-  test('excludes non-matches, applies the limit, and never returns bio text', () => {
+  test('excludes non-matches, applies the limit option, and never returns bio text', () => {
     const many = Array.from({ length: 30 }, (_, i) =>
       cand({ id: i + 1, name: `P${String(i).padStart(2, '0')}`, job_role: 'Designer', experience: 'SECRET BIO design' })
     );
-    const ranked = rankCandidates([...many, cand({ id: 99, job_role: 'Plumber' })], ['design'], innerNames, 5);
+    const ranked = rankCandidates([...many, cand({ id: 99, job_role: 'Plumber' })], ['design'], innerNames, { limit: 5 });
     expect(ranked).toHaveLength(5);
     expect(ranked.find((r) => r.id === 99)).toBeUndefined();
     const json = JSON.stringify(ranked);

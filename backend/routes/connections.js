@@ -1,8 +1,9 @@
 const express = require('express');
 const { pool, withUserContext } = require('../db');
-const { shapeInner, shapeSecondary, pickPrimaryVia } = require('../lib/graphPayload');
+const { shapeInner, shapeSecondary } = require('../lib/graphPayload');
 const { interpret, MAX_QUESTION_LENGTH } = require('../lib/askInterpret');
 const { rankCandidates } = require('../lib/askRank');
+const { planLookups, buildCandidates, ROWS_PER_WORD } = require('../lib/askRetrieve');
 const { askRateLimiter } = require('../middleware/rateLimitAsk');
 
 const router = express.Router();
@@ -117,7 +118,8 @@ router.get('/graph', async (req, res) => {
 /**
  * "Ask your network": rank people the viewer can already see against a free-text question and say
  * how to reach them. Retrieval and authorization stay in SQL (the viewer's own connections and
- * app_unified_secondary_search); interpretation is rules by default (see lib/askInterpret.js).
+ * app_unified_secondary_search); interpretation, lookup planning, candidate building and ranking
+ * live in backend/lib (askInterpret, askRetrieve, askRank).
  *
  * Body: { question: string (1..300 chars) }
  * Response rows never include phone numbers or bio text; `matched` names fields only.
@@ -137,77 +139,39 @@ router.post('/ask', askRateLimiter, async (req, res) => {
       return res.status(400).json({ error: `question must be at most ${MAX_QUESTION_LENGTH} characters` });
     }
 
-    const { mode, terms } = await interpret(question);
+    const { mode, terms, synonyms } = await interpret(question);
     if (terms.length === 0) {
       return res.json({ mode, interpretation: { terms }, results: [], meta: { considered: 0 } });
     }
 
-    const { connectionRows, secondaryByTerm } = await withUserContext(viewerIdInt, async (client) => {
+    const { words, groupOf } = planLookups(terms, synonyms);
+    const { connectionRows, secondaryByWord } = await withUserContext(viewerIdInt, async (client) => {
       const conns = await client.query(VIEWER_CONNECTIONS_SQL, [viewerIdInt]);
-      // The SQL search ANDs words, so look each term up separately and merge (OR semantics).
-      const byTerm = [];
-      for (const term of terms) {
+      const byWord = [];
+      for (const word of words) {
         // eslint-disable-next-line no-await-in-loop
         const found = await client.query(
           `SELECT res_peer_id, res_peer_name, res_peer_job_role, res_peer_industry, res_peer_experience,
                   res_source_edge, res_via_inner_peer_ids
-           FROM app_unified_secondary_search($1, $2, 100, 0, NULL::INTEGER, NULL::INTEGER, FALSE)`,
-          [viewerIdInt, term]
+           FROM app_unified_secondary_search($1, $2, $3, 0, NULL::INTEGER, NULL::INTEGER, FALSE)`,
+          [viewerIdInt, word, ROWS_PER_WORD]
         );
-        byTerm.push({ term, rows: found.rows });
+        byWord.push({ word, rows: found.rows });
       }
-      return { connectionRows: conns.rows, secondaryByTerm: byTerm };
+      return { connectionRows: conns.rows, secondaryByWord: byWord };
     });
 
-    const innerRows = connectionRows.filter((r) => r.circle_type === 'inner');
-    const innerStrengthById = new Map(innerRows.map((r) => [r.peer_id, Number(r.strength) || 0]));
-    const innerNameById = new Map(innerRows.map((r) => [r.peer_id, r.peer_name]));
-
-    const candidates = innerRows.map((r) => ({
-      id: r.peer_id,
-      name: r.peer_name,
-      job_role: r.peer_job_role,
-      industry: r.peer_industry,
-      experience: r.peer_experience,
-      kind: 'inner',
-      strength: Number(r.strength) || 0,
-      direct: false,
-      via: [],
-      primary_via: null,
-    }));
-
-    const secondaryById = new Map();
-    for (const { term, rows } of secondaryByTerm) {
-      for (const r of rows) {
-        const id = r.res_peer_id;
-        if (id === viewerIdInt || innerStrengthById.has(id)) continue;
-        let entry = secondaryById.get(id);
-        if (!entry) {
-          const via = [...new Set((r.res_via_inner_peer_ids || []).filter((v) => v != null))].sort((a, b) => a - b);
-          entry = {
-            id,
-            name: r.res_peer_name,
-            job_role: r.res_peer_job_role,
-            industry: r.res_peer_industry,
-            experience: r.res_peer_experience,
-            kind: 'secondary',
-            strength: 0,
-            direct: Boolean(r.res_source_edge),
-            via,
-            primary_via: pickPrimaryVia(via, innerStrengthById),
-            ftsTerms: [],
-          };
-          secondaryById.set(id, entry);
-        }
-        entry.ftsTerms.push(term);
-      }
-    }
-    candidates.push(...secondaryById.values());
+    const { candidates, innerNameById } = buildCandidates({
+      viewerId: viewerIdInt,
+      connectionRows,
+      secondaryByWord,
+      groupOf,
+    });
 
     res.json({
       mode,
       interpretation: { terms },
-      results: rankCandidates(candidates, terms, innerNameById),
+      results: rankCandidates(candidates, terms, innerNameById, { synonyms }),
       meta: { considered: candidates.length },
     });
   } catch (err) {

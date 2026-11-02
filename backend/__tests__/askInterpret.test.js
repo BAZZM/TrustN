@@ -13,10 +13,17 @@ describe('interpretRules', () => {
     expect(interpretRules('anyone managing budgets').terms).toEqual(['managing', 'budgets']);
   });
 
-  test('maps everyday job words onto profile vocabulary', () => {
-    expect(interpretRules('any doctors?').terms).toEqual(['healthcare']);
-    expect(interpretRules('a lawyer').terms).toEqual(['legal']);
-    expect(interpretRules('a developer').terms).toEqual(['engineer']);
+  test('adds a synonym next to the word the user typed instead of replacing it', () => {
+    expect(interpretRules('any doctors?')).toMatchObject({ terms: ['doctors'], synonyms: { doctors: ['healthcare'] } });
+    expect(interpretRules('a lawyer')).toMatchObject({ terms: ['lawyer'], synonyms: { lawyer: ['legal'] } });
+    expect(interpretRules('software')).toMatchObject({ terms: ['software'], synonyms: { software: ['engineer'] } });
+    expect(interpretRules('design')).toMatchObject({ terms: ['design'], synonyms: {} });
+  });
+
+  test('keeps accented and non-Latin words whole instead of shredding them', () => {
+    expect(interpretRules('médecin à Zürich').terms).toEqual(['médecin', 'zürich']);
+    expect(interpretRules('日本の医者').terms).toEqual(['日本の医者']);
+    expect(interpretRules('Müller, Ärztin').terms).toEqual(['müller', 'ärztin']);
   });
 
   test('de-duplicates, ignores short tokens and punctuation, and caps the term count', () => {
@@ -34,7 +41,7 @@ describe('interpretRules', () => {
 });
 
 describe('stem', () => {
-  test('is a light stemmer for substring matching', () => {
+  test('is a light stemmer for matching', () => {
     expect(stem('designers')).toBe('design');
     expect(stem('managing')).toBe('manag');
     expect(stem('budgets')).toBe('budget');
@@ -45,8 +52,9 @@ describe('stem', () => {
 });
 
 describe('validateTerms', () => {
-  test('accepts short lowercase plain-letter terms', () => {
+  test('accepts short lowercase plain-letter terms, including accented letters', () => {
     expect(validateTerms(['Healthcare', 'design'])).toEqual(['healthcare', 'design']);
+    expect(validateTerms(['médecin'])).toEqual(['médecin']);
   });
 
   test.each([
@@ -91,7 +99,7 @@ describe('interpret', () => {
       env: { ASK_LLM: '1', ANTHROPIC_API_KEY: 'secret' },
       fetchImpl,
     });
-    expect(result).toEqual({ mode: 'llm', terms: ['healthcare', 'design'] });
+    expect(result).toEqual({ mode: 'llm', terms: ['healthcare', 'design'], synonyms: {} });
     const [url, init] = fetchImpl.mock.calls[0];
     expect(url).toBe('https://api.anthropic.com/v1/messages');
     expect(init.headers['x-api-key']).toBe('secret');
@@ -105,7 +113,7 @@ describe('interpret', () => {
       env: { ASK_LLM: '1', ANTHROPIC_API_KEY: 'k' },
       fetchImpl,
     });
-    expect(result).toEqual({ mode: 'rules', terms: ['healthcare', 'design'] });
+    expect(result).toEqual({ mode: 'rules', terms: ['healthcare', 'design'], synonyms: {} });
   });
 
   test('falls back to rules on unparsable output, HTTP errors and thrown errors', async () => {
@@ -118,7 +126,7 @@ describe('interpret', () => {
     for (const fetchImpl of bad) {
       // eslint-disable-next-line no-await-in-loop
       const result = await interpret('healthcare', { env, fetchImpl });
-      expect(result).toEqual({ mode: 'rules', terms: ['healthcare'] });
+      expect(result).toEqual({ mode: 'rules', terms: ['healthcare'], synonyms: {} });
     }
   });
 });
