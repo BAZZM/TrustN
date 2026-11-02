@@ -344,6 +344,160 @@ describe("ConnectionsGraph", () => {
     });
   });
 
+  describe("introduction path highlight", () => {
+    function mountBranch(overrides = {}) {
+      const root = createRoot(container);
+      act(() => {
+        root.render(
+          <ConnectionsGraph
+            currentUserName="Alice"
+            innerConnections={[
+              { id: "1", name: "Diana Davis", strength: 5 },
+              { id: "2", name: "Bob Brown", strength: 4 },
+            ]}
+            overflowInnerConnections={[]}
+            focusUserId="1"
+            focusedConnection={{ id: "1", name: "Diana Davis" }}
+            secondaryConnections={[
+              { id: "p1", peer_id: "p1", name: "Paul Parker", strength: 2 },
+              { id: "p2", peer_id: "p2", name: "Quinn Quinn", strength: 2 },
+            ]}
+            secondaryLoading={false}
+            onFocusConnection={jest.fn()}
+            onResetFocus={jest.fn()}
+            onSelectSecondary={jest.fn()}
+            statsSummary={<span>stats</span>}
+            t={t}
+            immersive
+            {...overrides}
+          />
+        );
+      });
+    }
+    const pathEdges = () => [...container.querySelectorAll(".connections__edge--path")];
+
+    it("highlights You → introducer → the selected person and nothing else", () => {
+      mountBranch({ selectedSecondaryId: "p1" });
+      const edges = pathEdges();
+      expect(edges).toHaveLength(2);
+      expect(edges.filter((e) => e.classList.contains("connections__edge--secondary"))).toHaveLength(1);
+      expect(edges.filter((e) => e.classList.contains("connections__edge--inner"))).toHaveLength(1);
+    });
+
+    it("highlights no path when nobody is selected", () => {
+      mountBranch();
+      expect(pathEdges()).toHaveLength(0);
+    });
+
+    it("highlights no path when the selected person is not drawn", () => {
+      mountBranch({ selectedSecondaryId: "not-visible" });
+      expect(pathEdges()).toHaveLength(0);
+    });
+  });
+
+  describe("deprioritised inner peers", () => {
+    const mount = (focusUserId) => {
+      const root = createRoot(container);
+      act(() => {
+        root.render(
+          <ConnectionsGraph
+            currentUserName="Alice"
+            innerConnections={[
+              { id: "1", name: "Diana Davis", strength: 5 },
+              { id: "2", name: "Bob Brown", strength: 4 },
+              { id: "3", name: "Carol Chen", strength: 3 },
+            ]}
+            overflowInnerConnections={[]}
+            focusUserId={focusUserId}
+            focusedConnection={focusUserId ? { id: focusUserId, name: "Diana Davis" } : null}
+            secondaryConnections={[]}
+            secondaryLoading={false}
+            onFocusConnection={jest.fn()}
+            onResetFocus={jest.fn()}
+            statsSummary={<span>stats</span>}
+            t={t}
+            immersive
+          />
+        );
+      });
+    };
+
+    it("marks the other inner peers dimmed (labels hidden until hover or focus) while a branch is open", () => {
+      mount("1");
+      const dimmed = container.querySelectorAll(".connections__inner-node--dimmed");
+      expect(dimmed).toHaveLength(2);
+      expect([...dimmed].map((el) => el.getAttribute("aria-label")).sort()).toEqual(["Bob Brown", "Carol Chen"]);
+    });
+
+    it("dims nobody when no branch is open", () => {
+      mount(null);
+      expect(container.querySelectorAll(".connections__inner-node--dimmed")).toHaveLength(0);
+    });
+  });
+
+  describe("touch targets", () => {
+    const hitRadii = () =>
+      [...container.querySelectorAll(".connections__inner-node__hit")].map((c) => Number(c.getAttribute("r")));
+    const mount = () => {
+      const root = createRoot(container);
+      act(() => {
+        root.render(
+          <ConnectionsGraph
+            currentUserName="Alice"
+            innerConnections={[{ id: "1", name: "Diana Davis", strength: 5 }]}
+            overflowInnerConnections={[]}
+            focusUserId={null}
+            focusedConnection={null}
+            secondaryConnections={[]}
+            secondaryLoading={false}
+            onFocusConnection={jest.fn()}
+            onResetFocus={jest.fn()}
+            statsSummary={<span>stats</span>}
+            t={t}
+            immersive
+          />
+        );
+      });
+    };
+    const mockMedia = (matching) => {
+      window.matchMedia = jest.fn().mockImplementation((query) => ({
+        matches: matching.some((m) => query.includes(m)),
+        media: query,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+      }));
+    };
+
+    it("uses the small hit padding for a mouse on a wide screen", () => {
+      mockMedia([]);
+      mount();
+      const [mouse] = hitRadii();
+      expect(mouse).toBeGreaterThan(0);
+
+      document.body.removeChild(container);
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      mockMedia(["pointer: coarse"]);
+      mount();
+      const [coarse] = hitRadii();
+      expect(coarse).toBeGreaterThan(mouse);
+    });
+
+    it("uses the large hit padding on a narrow screen too", () => {
+      mockMedia(["767px"]);
+      mount();
+      const [narrow] = hitRadii();
+      mockMedia(["pointer: coarse"]);
+      document.body.removeChild(container);
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      mount();
+      expect(narrow).toBe(hitRadii()[0]);
+    });
+  });
+
   describe("keyboard navigation", () => {
     const press = (target, key) =>
       act(() => {

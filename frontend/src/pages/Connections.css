@@ -185,6 +185,51 @@
   stroke-width: 1.8;
 }
 
+/* Wide screens: stats dock and buttons share one row under the graph, giving the graph the height */
+@media (min-width: 768px) {
+  /* Doubled class so this wins over the shell's base `display: flex` defined further down */
+  .connections__graph-shell.connections__graph-shell--immersive {
+    display: grid;
+    grid-template-columns: 1fr auto auto 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .connections__graph-shell--immersive > .connections__graph-stage--immersive {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    align-self: stretch;
+  }
+
+  .connections__graph-shell--immersive > .connections__immersive-bottom-dock {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .connections__graph-shell--immersive > .connections__immersive-fab-dock {
+    grid-column: 3;
+    grid-row: 2;
+  }
+}
+
+/* Peers behind the open branch keep their node but lose their label (it piles onto the hub's) until
+   they are hovered or focused. The aria-label on the node is unchanged. */
+.connections__inner-node--dimmed .connections__inner-label {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.connections__inner-node--dimmed:hover .connections__inner-label,
+.connections__inner-node--dimmed:focus-visible .connections__inner-label {
+  opacity: 1;
+}
+
+/* The selected person's introduction path: You → introducer → them */
+.connections__edge--path {
+  stroke: var(--color-accent);
+  stroke-width: 2.8;
+}
+
 .connections__center-glow {
   fill: rgba(95, 148, 255, 0.16);
 }
@@ -1214,7 +1259,8 @@
   gap: var(--space-sm);
 }
 
-.connections__ask-label {
+.connections__ask-label,
+.connections__sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1276,7 +1322,7 @@
 .connections__ask-error {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--color-danger, #ff8a8a);
+  color: var(--color-error);
 }
 
 .connections__ask-results {
@@ -1683,8 +1729,14 @@
 }
 
 @media (min-width: 768px) {
-  .connections--dock-clearance {
+  /* Doubled class: the generic `.page { max-width: 100% }` loads later and would otherwise win */
+  .connections.connections--dock-clearance {
     padding-left: var(--space-xl);
     padding-right: var(--space-xl);
+    /* The full-bleed shell has no width cap; loading, empty and error states keep the readable column */
+    width: 100%;
+    max-width: min(100%, 860px);
+    margin-left: auto;
+    margin-right: auto;
   }
 }

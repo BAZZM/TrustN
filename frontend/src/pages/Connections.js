@@ -13,6 +13,7 @@ import {
 } from "../components/connections/graphLayout";
 import UnifiedSecondarySearchBar from "../components/connections/UnifiedSecondarySearchBar";
 import AskNetworkPanel from "../components/connections/AskNetworkPanel";
+import { resolveAskPick } from "../components/connections/askPick";
 import "./Connections.css";
 
 /** True iff the focused inner peer is one of the secondary's `via` introducers; matches app_can_intermediate. */
@@ -286,14 +287,12 @@ export default function Connections() {
   /** Jump to an "ask" result: open the introducer's branch and select the person once it loads. */
   const handleAskPick = useCallback(
     (result) => {
-      if (result.kind === "inner") {
-        handleFocusConnection({ id: String(result.id) });
-        return;
-      }
-      if (result.path?.kind === "via_inner" && result.path.via?.id != null) {
-        handleFocusConnection({ id: String(result.path.via.id) });
-        pendingAskPickRef.current = String(result.id);
-        setAskPinnedId(String(result.id));
+      const target = resolveAskPick(result);
+      if (!target) return;
+      handleFocusConnection({ id: target.focusInnerId });
+      if (target.selectSecondaryId) {
+        pendingAskPickRef.current = target.selectSecondaryId;
+        setAskPinnedId(target.selectSecondaryId);
       }
     },
     [handleFocusConnection]

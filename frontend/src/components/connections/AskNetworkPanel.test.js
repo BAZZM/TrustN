@@ -22,6 +22,7 @@ const translations = {
   "connections.askExampleOne": "Who works in healthcare?",
   "connections.askExampleTwo": "Anyone in marketing?",
   "connections.askResultsAria": "Matches",
+  "connections.askResultsCount": "{count} people found",
 };
 const t = (key) => translations[key] || key;
 
@@ -134,6 +135,25 @@ describe("AskNetworkPanel", () => {
     expect(rows[0].textContent).toContain("You → Frank Foster");
     expect(rows[1].textContent).toContain("You → Bob Brown → Kate King");
     expect(rows[1].textContent).toContain("Matches marketing. Introduced through Bob Brown.");
+  });
+
+  it("announces loading, the number of matches and an empty answer to screen readers", async () => {
+    let resolve;
+    axios.post.mockReturnValue(new Promise((r) => (resolve = r)));
+    mount();
+    type("marketing");
+    submit();
+    const live = () => [...container.querySelectorAll("[role='status']")].map((n) => n.textContent);
+    expect(live()).toContain("Looking through your network...");
+
+    resolve({ data: { results: [result(), result({ id: 2, name: "Other" })] } });
+    await flush();
+    expect(live()).toContain("2 people found");
+
+    axios.post.mockResolvedValue({ data: { results: [] } });
+    submit();
+    await flush();
+    expect(live()).toContain("No one in your network matches that yet.");
   });
 
   it("hands the chosen result to onPick", async () => {

@@ -101,7 +101,11 @@ export default function AskNetworkPanel({ baseURL, t, onPick, inputId = "connect
         </div>
       ) : null}
 
-      {status === "loading" ? <p className="connections__ask-status">{t("connections.askLoading")}</p> : null}
+      {status === "loading" ? (
+        <p className="connections__ask-status" role="status">
+          {t("connections.askLoading")}
+        </p>
+      ) : null}
 
       {status === "error" ? (
         <div className="connections__ask-error" role="alert">
@@ -113,7 +117,15 @@ export default function AskNetworkPanel({ baseURL, t, onPick, inputId = "connect
       ) : null}
 
       {status === "done" && results.length === 0 ? (
-        <p className="connections__ask-status">{t("connections.askEmpty")}</p>
+        <p className="connections__ask-status" role="status">
+          {t("connections.askEmpty")}
+        </p>
+      ) : null}
+
+      {status === "done" && results.length > 0 ? (
+        <p className="connections__sr-only" role="status">
+          {t("connections.askResultsCount").replace("{count}", String(results.length))}
+        </p>
       ) : null}
 
       {status === "done" && results.length > 0 ? (

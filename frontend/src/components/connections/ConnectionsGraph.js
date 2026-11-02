@@ -3,6 +3,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { usePinchPanZoom } from "../../hooks/usePinchPanZoom";
 import useModalOverlay from "../../hooks/useModalOverlay";
 import useForceLayout from "../../hooks/useForceLayout";
+import useMediaQuery from "../../hooks/useMediaQuery";
 import {
   GRAPH_CENTER,
   GRAPH_VIEWBOX,
@@ -53,10 +54,18 @@ function writeFreeLayoutPreference(free) {
   }
 }
 
-/** The node moved to its live physics position when there is one. */
-function withLivePosition(positions, key, node) {
+/**
+ * The node moved to its live physics position when there is one. Returns the *same object* while
+ * neither the rest node nor its position changed, so memoized children skip re-rendering.
+ */
+function withLivePosition(positions, key, node, cache) {
   const live = positions && positions.get(key);
-  return live ? { ...node, x: live.x, y: live.y } : node;
+  if (!live) return node;
+  const prev = cache.get(key);
+  if (prev && prev.base === node && prev.x === live.x && prev.y === live.y) return prev.value;
+  const value = { ...node, x: live.x, y: live.y };
+  cache.set(key, { base: node, x: live.x, y: live.y, value });
+  return value;
 }
 
 /** SVG user-space point under a pointer event (accounts for CSS transforms such as pinch-zoom). */
@@ -74,7 +83,7 @@ function pointerToViewBox(event) {
 /** Arrow keys move focus between sibling nodes: right/down = next, left/up = previous. */
 const ARROW_STEP = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
 
-function Node({
+function NodeBase({
   node,
   label,
   className,
@@ -234,6 +243,12 @@ function Node({
   );
 }
 
+/**
+ * Memoized so a physics frame only re-renders the nodes whose position actually changed; the parent
+ * keeps every other prop stable (cached live nodes, shared transition object, stable callbacks).
+ */
+const Node = React.memo(NodeBase);
+
 export default function ConnectionsGraph({
   currentUserName,
   innerConnections,
@@ -260,7 +275,10 @@ export default function ConnectionsGraph({
   renderAsk = null,
 }) {
   const prefersReducedMotion = useReducedMotion();
-  const [narrowViewport, setNarrowViewport] = useState(false);
+  const narrowViewport = useMediaQuery("(max-width: 767px)");
+  // Touch targets stay generous on phones and on any coarse pointer (tablets, touch laptops).
+  const coarsePointer = useMediaQuery("(pointer: coarse)");
+  const touchTargets = narrowViewport || coarsePointer;
   // One modal at a time: null | "sheet" | "search" | "ask"
   const [overlay, setOverlay] = useState(null);
   const sheetOpen = overlay === "sheet";
@@ -287,14 +305,6 @@ export default function ConnectionsGraph({
   const { viewportRef, transformStyle, consumeShouldIgnoreTap, resetTransform, scale } = usePinchPanZoom({
     disabled: pinchDisabled,
   });
-
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 767px)");
-    const apply = () => setNarrowViewport(media.matches);
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, []);
 
   useEffect(() => {
     if (!immersive || immersiveStatsKey == null) return undefined;
@@ -351,14 +361,18 @@ export default function ConnectionsGraph({
     getInitialFocus: () => document.getElementById("connections-ask-input"),
   });
 
-  const nodeMotionTransition = prefersReducedMotion
-    ? { duration: 0.12, ease: "linear" }
-    : { type: "spring", stiffness: 280, damping: 26 };
+  const nodeMotionTransition = useMemo(
+    () =>
+      prefersReducedMotion
+        ? { duration: 0.12, ease: "linear" }
+        : { type: "spring", stiffness: 280, damping: 26 },
+    [prefersReducedMotion]
+  );
 
   const edgeMotionTransition = (duration) =>
     prefersReducedMotion ? { duration: 0.1, ease: "linear" } : { duration };
 
-  const innerHitPadding = narrowViewport ? NODE_HIT_PADDING : 10;
+  const innerHitPadding = touchTargets ? NODE_HIT_PADDING : 10;
 
   const innerLayoutOptions = useMemo(
     () => (immersive && focusUserId ? { layoutMode: "focus_hub" } : undefined),
@@ -413,16 +427,17 @@ export default function ConnectionsGraph({
     reducedMotion: Boolean(prefersReducedMotion),
   });
 
+  const liveCache = useRef(new Map());
   const innerLayout = useMemo(
-    () => innerRestLayout.map((n) => withLivePosition(positions, `i:${n.id}`, n)),
+    () => innerRestLayout.map((n) => withLivePosition(positions, `i:${n.id}`, n, liveCache.current)),
     [innerRestLayout, positions]
   );
   const secondaryLayout = useMemo(
-    () => secondaryRestLayout.map((n) => withLivePosition(positions, `s:${n.id}`, n)),
+    () => secondaryRestLayout.map((n) => withLivePosition(positions, `s:${n.id}`, n, liveCache.current)),
     [secondaryRestLayout, positions]
   );
   const youHubLayout = useMemo(
-    () => (youRestLayout ? withLivePosition(positions, "you", youRestLayout) : null),
+    () => (youRestLayout ? withLivePosition(positions, "you", youRestLayout, liveCache.current) : null),
     [youRestLayout, positions]
   );
   const youNodeForHub = useMemo(() => {
@@ -436,15 +451,20 @@ export default function ConnectionsGraph({
     };
   }, [youHubLayout, currentUserName, t]);
 
-  const dragHandlers = (key) =>
-    freeLayoutOn
-      ? {
-          onDrag: (_node, point) => pin(key, point.x, point.y),
-          onDragEnd: () => release(key),
-        }
-      : {};
+  // Stable per node kind (the node argument carries the id) so memoized nodes are not re-rendered.
+  const dragInner = useCallback((node, point) => pin(`i:${node.id}`, point.x, point.y), [pin]);
+  const dragInnerEnd = useCallback((node) => release(`i:${node.id}`), [release]);
+  const dragSecondary = useCallback((node, point) => pin(`s:${node.id}`, point.x, point.y), [pin]);
+  const dragSecondaryEnd = useCallback((node) => release(`s:${node.id}`), [release]);
+  const dragYou = useCallback((_node, point) => pin("you", point.x, point.y), [pin]);
+  const dragYouEnd = useCallback(() => release("you"), [release]);
   const hiddenSecondaryCount = Math.max(0, secondaryConnections.length - visibleSecondary.length);
   const focusedLayoutNode = innerLayout.find((item) => item.isFocused) || null;
+  // The selected person's path is You → focused inner peer → them; only drawn when they are on screen.
+  const pathSecondaryId =
+    selectedSecondaryId && secondaryLayout.some((n) => n.id === selectedSecondaryId)
+      ? selectedSecondaryId
+      : null;
   const centerHubName = focusHubActive
     ? focusedConnection?.name || focusedLayoutNode?.name || currentUserName || t("connections.you")
     : currentUserName || t("connections.you");
@@ -505,9 +525,11 @@ export default function ConnectionsGraph({
           y1={GRAPH_CENTER}
           x2={youHubLayout.x}
           y2={youHubLayout.y}
-          className="connections__edge connections__edge--inner"
+          className={
+            "connections__edge connections__edge--inner" + (pathSecondaryId ? " connections__edge--path" : "")
+          }
           initial={false}
-          animate={{ opacity: 0.45 }}
+          animate={{ opacity: pathSecondaryId ? 0.95 : 0.45 }}
           transition={edgeMotionTransition(0.2)}
         />
       )}
@@ -520,9 +542,20 @@ export default function ConnectionsGraph({
             y1={focusedLayoutNode?.y ?? GRAPH_CENTER}
             x2={node.x}
             y2={node.y}
-            className="connections__edge connections__edge--secondary"
+            className={
+              "connections__edge connections__edge--secondary" +
+              (node.id === pathSecondaryId ? " connections__edge--path" : "")
+            }
             initial={prefersReducedMotion ? false : { opacity: 0 }}
-            animate={{ opacity: secondarySearchHighlight ? 0.58 : 0.46 }}
+            animate={{
+              opacity: pathSecondaryId
+                ? node.id === pathSecondaryId
+                  ? 0.95
+                  : 0.18
+                : secondarySearchHighlight
+                  ? 0.58
+                  : 0.46,
+            }}
             transition={edgeMotionTransition(0.22)}
           />
         ))}
@@ -567,8 +600,9 @@ export default function ConnectionsGraph({
             searchHighlight={secondarySearchHighlight}
             motionTransition={nodeMotionTransition}
             instant={freeLayoutOn}
-            {...dragHandlers(`s:${node.id}`)}
-            hitPadding={narrowViewport ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
+            onDrag={freeLayoutOn ? dragSecondary : undefined}
+            onDragEnd={freeLayoutOn ? dragSecondaryEnd : undefined}
+            hitPadding={touchTargets ? Math.max(12, NODE_HIT_PADDING - 2) : 10}
             tapSlop={immersive ? tapSlop : 0}
             hideLabel
           />
@@ -623,14 +657,16 @@ export default function ConnectionsGraph({
             label={node.name}
             className={
               "connections__inner-node" +
-              (node.peerIntroduced ? " connections__inner-node--acquired" : "")
+              (node.peerIntroduced ? " connections__inner-node--acquired" : "") +
+              (focusHubActive && !node.isFocused ? " connections__inner-node--dimmed" : "")
             }
             labelClassName="connections__inner-label"
             onSelect={onFocusConnection}
             onArrow={moveInnerFocus}
             motionTransition={nodeMotionTransition}
             instant={freeLayoutOn}
-            {...dragHandlers(`i:${node.id}`)}
+            onDrag={freeLayoutOn ? dragInner : undefined}
+            onDragEnd={freeLayoutOn ? dragInnerEnd : undefined}
             hitPadding={innerHitPadding}
             tapSlop={tapSlop}
           />
@@ -646,7 +682,8 @@ export default function ConnectionsGraph({
           onArrow={moveInnerFocus}
           motionTransition={nodeMotionTransition}
           instant={freeLayoutOn}
-          {...dragHandlers("you")}
+          onDrag={freeLayoutOn ? dragYou : undefined}
+          onDragEnd={freeLayoutOn ? dragYouEnd : undefined}
           hitPadding={innerHitPadding}
           tapSlop={tapSlop}
         />

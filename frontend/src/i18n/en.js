@@ -59,6 +59,7 @@ const en = {
     askExampleOne: "Who works in healthcare?",
     askExampleTwo: "Anyone in marketing?",
     askResultsAria: "People who match your question",
+    askResultsCount: "{count} people found",
     loadErrorTitle: "Couldn't load your network",
     loadErrorBody: "Something went wrong reaching the server. Check your connection and try again.",
     retry: "Try again",
