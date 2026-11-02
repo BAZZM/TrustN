@@ -321,14 +321,18 @@ POST /api/connections/ask   { "question": "who works in healthcare and has led a
 
 | Stage | What happens | Where |
 |-------|--------------|-------|
-| Interpret | The question becomes up to 6 terms. **Rules by default**: lower-case, drop question words, map everyday job words (`doctor` → `healthcare`, `developer` → `engineer`). Optional model call only when `ASK_LLM=1` **and** `ANTHROPIC_API_KEY` are set; it sees only the question text, its output is validated to short plain-letter terms, and any failure falls back to the rules. | `backend/lib/askInterpret.js` |
-| Retrieve | Inner peers from the viewer's connections, plus `app_unified_secondary_search` **once per term**, merged (the SQL search ANDs words, so one call per term gives OR semantics). Terms are sent as written; Postgres stems them itself. | `routes/connections.js` |
-| Rank | `score = 4*coverage + fieldQuality + (inner ? 2 : 0) + (has introducer ? 1 : 0) + min(strength,4)*0.25`. `coverage` = matched terms / terms. Field weights: role 1.0, industry 0.8, bio 0.5, name 0.3 (a full-text hit that is not a substring counts 0.5). Ties: score, then name, then id. | `backend/lib/askRank.js` |
+| Interpret | The question becomes up to 6 terms (letters and digits in any script, so `médecin` and `Zürich` survive). **Rules by default**: lower-case, drop question words, and attach a **synonym alongside** the typed word (`software` → also `engineer`, `doctor` → also `healthcare`); the typed word is never replaced. Optional model call only when `ASK_LLM=1` **and** `ANTHROPIC_API_KEY` are set; it sees only the question text, its output is validated to short plain-letter terms, and any failure falls back to the rules. | `backend/lib/askInterpret.js` |
+| Retrieve | Inner peers from the viewer's connections, plus `app_unified_secondary_search` **once per searched word** (terms first, then synonyms; at most 5 words, 50 rows each), merged (the SQL search ANDs words, so one call per word gives OR semantics). Words are sent as written; Postgres stems them itself. The route only runs the SQL; planning and candidate building are in `backend/lib/askRetrieve.js` (unit tested). | `routes/connections.js`, `lib/askRetrieve.js` |
+| Rank | `score = 4*coverage + fieldQuality + (inner ? 2 : 0) + (has introducer ? 1 : 0) + min(strength,4)*0.25`. `coverage` = matched terms / terms. Field weights: role 1.0, industry 0.8, bio 0.5, name 0.3 (a full-text hit that is not a word-start match counts 0.5). **Matching is by word start, not raw substring**: `art` matches "Art Director" but not "smart"; a light stem (`designers` → `design`, used only when at least 4 letters long) and any synonym also count. Ties: score, then name, then id. | `backend/lib/askRank.js` |
 | Path | `direct_inner` (inner peer), `via_inner` (through `primary_via`), or `direct_edge_only` (a direct link with no introducer; shown but not actionable). | `askRank.js` |
 
 Response rows carry `id`, `name`, `job_role`, `industry`, `kind`, `score`, `matched` (field **names** only), `path` and a templated `reason`. **No phone numbers and no bio text.** At most 12 results; 20 questions per minute per user (`ASK_RATE_LIMIT_MAX`).
 
 Authorization is unchanged: everything comes from the viewer's own connections and the existing SECURITY DEFINER search, so a person outside the viewer's network cannot appear.
+
+**Known property:** like the existing `secondary-search`, matching reads the full profile text of people the viewer can see, so asking about a word can reveal that someone's bio contains it (the response only ever names the *field* that matched, never the text). If bio text should not be searchable by people who cannot read it, that is a product decision to make in the SQL function, not here.
+
+**Known limit:** the per-word lookups run one after another (each re-does the relationship discovery). They are capped (5 words x 50 rows) and rate limited, and measured at roughly 100-350ms on the demo data; an OR-capable SQL function would replace them but needs a migration.
 
 **Deliberately not used yet:** embeddings / pgvector. The demo scale is served by full-text search; embeddings would replace only the *Retrieve* stage (the model never needs to see people data to rank them).
 

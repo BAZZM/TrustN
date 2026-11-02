@@ -51,6 +51,8 @@ This document is the **working map** for anyone changing the Intro frontend (inc
 ### Connections module (platform-agnostic core)
 
 - **`graphLayout.js`** is **pure JS** — stable contract for web + potential native; document defaults at top of file; coordinate constants (`GRAPH_VIEWBOX`, ring radii, `NODE_HIT_PADDING`, caps).
+- **Connections data:** `Connections.js` loads the inner ring with **`GET /api/connections/graph?secondary=0`** and a focused branch with **`GET /api/connections/graph?focus=<innerId>&q=…`** (slim rows; `direct` / `via` / `primary_via` — see [`RELATIONSHIP_BASED_CONNECTIONS.md`](RELATIONSHIP_BASED_CONNECTIONS.md)). It no longer calls `/secondary-search` or reads `via_inner_peer_ids` / `sources`.
+- **Immersive view** applies at every width (not just under 768px); wide screens centre the graph and cap the nav. Modals (sheet, branch search, Ask) share one overlay state and `useModalOverlay` (inert background, focus return). Optional free-form layout is behind a flag (`?layout=free`).
 - **`ConnectionsGraph.js`** is the **browser adapter** (SVG + springs + pointer semantics). Pointer/event ordering documented in [`FRONTEND_DOCUMENTATION.md`](FRONTEND_DOCUMENTATION.md) matters for bugs (double-click, backdrop clearing focus).
 
 ### Contacts “radial” (dial UI)
@@ -74,7 +76,9 @@ These files **exist** but are **not imported** by `App.js` routes today:
 When listing or searching “secondary” users:
 
 - **`GET /api/connections/secondary-for/:id`** — discovery for one inner; filters `job_role` / `industry`.
-- **`GET /api/connections/secondary-search`** — hybrid discovery + stored secondaries + FTS **`q`**; with **`focused_inner_peer_id`**, send **`branch_only=1`** when the product intent is “only paths through this inner” (Connections graph + Contacts dial).
+- **`GET /api/connections/secondary-search`** — hybrid discovery + stored secondaries + FTS **`q`**; with **`focused_inner_peer_id`**, send **`branch_only=1`** when the product intent is “only paths through this inner” (**Contacts dial** only; it returns phone and bio fields).
+- **`GET /api/connections/graph`** — the **Connections graph** endpoint: inner + secondary rows with explicit `direct` / `via` / `primary_via`, no phone or bio; `focus` implies branch-only. Prefer it for any graph UI.
+- **`POST /api/connections/ask`** — natural-language search with introduction paths (rate limited; see `RELATIONSHIP_BASED_CONNECTIONS.md`).
 
 Backend authorization is strict (403/401). UI should surface failures without leaking internals.
 
